@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@layer base {
+  body {
+    @apply bg-surface text-gray-800 antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-brand-blue hover:bg-brand-blue-light text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg transition-colors;
+  }
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-colors;
+  }
+  .btn-gold {
+    @apply bg-brand-gold hover:bg-brand-gold-light text-white font-medium px-4 py-2 rounded-lg transition-colors;
+  }
+  .card {
+    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+  }
+  .input {
+    @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+  .badge-active { @apply inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800; }
+  .badge-promoted { @apply inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800; }
+  .badge-graduated { @apply inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-800; }
+  .badge-left { @apply inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600; }
+  .table-header { @apply bg-brand-blue text-white text-sm font-semibold; }
+  .table-row { @apply border-b border-gray-100 hover:bg-surface-muted transition-colors; }
+}

@@ -1,0 +1,217 @@
+// prisma/schema.prisma
+// Stars Law College — Finance & Student Management System
+// Data Model v1.0
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEPARTMENT
+// Represents an academic department. Can offer semester, annual, or both modes.
+// ─────────────────────────────────────────────────────────────────────────────
+model Department {
+  id            Int            @id @default(autoincrement())
+  name          String
+  code          String         @unique
+  offersSem     Boolean        @default(false)
+  offersAnn     Boolean        @default(false)
+  semsPerYear   Int?           // Required if offersSem = true
+  yearsDuration Int?           // Required if offersAnn = true (or for sem programs)
+  isDeleted     Boolean        @default(false)
+  feeStructures FeeStructure[]
+  sessions      Session[]
+  students      Student[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("departments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FEE STRUCTURE
+// Fee amount per department per program mode, with optional effective date range.
+// ─────────────────────────────────────────────────────────────────────────────
+model FeeStructure {
+  id            Int        @id @default(autoincrement())
+  department    Department @relation(fields: [departmentId], references: [id])
+  departmentId  Int
+  programMode   String     // 'semester' | 'annual'
+  feeAmount     Decimal    @db.Decimal(12, 2)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  createdAt     DateTime   @default(now())
+
+  @@map("fee_structures")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SESSION
+// Academic year/session linked to a department.
+// ─────────────────────────────────────────────────────────────────────────────
+model Session {
+  id           Int        @id @default(autoincrement())
+  department   Department @relation(fields: [departmentId], references: [id])
+  departmentId Int
+  startYear    Int
+  endYear      Int
+  label        String     // e.g. "2024-2026"
+  students     Student[]
+  createdAt    DateTime   @default(now())
+
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STUDENT
+// Master student record. Carries academic and program tracking fields.
+// version field enables optimistic concurrency.
+// ─────────────────────────────────────────────────────────────────────────────
+model Student {
+  id              Int              @id @default(autoincrement())
+  name            String
+  parentGuardian  String
+  cnic            String           // Stored as 13 digits, no dashes
+  registrationNo  String           @unique
+  rollNo          String?
+  department      Department       @relation(fields: [departmentId], references: [id])
+  departmentId    Int
+  session         Session?         @relation(fields: [sessionId], references: [id])
+  sessionId       Int?
+  programMode     String           // 'semester' | 'annual'
+  currentSemester Int?             // for semester mode
+  enrolledAt      DateTime?
+  cgpa            Float?
+  sgpa            Float?
+  status          String           @default("active") // 'active'|'promoted'|'graduated'|'left'
+  version         Int              @default(0)        // optimistic concurrency
+  isDeleted       Boolean          @default(false)
+  financeRecords  StudentFinance[]
+  payments        Payment[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@map("students")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STUDENT FINANCE
+// Per-term immutable ledger entry. Never mutated after promotion snapshot.
+// remaining = feeDue - feePaid - advanceTaken
+// ─────────────────────────────────────────────────────────────────────────────
+model StudentFinance {
+  id            Int      @id @default(autoincrement())
+  student       Student  @relation(fields: [studentId], references: [id])
+  studentId     Int
+  termLabel     String   // e.g. "2026-Sem-2" | "2024-Annual"
+  termType      String   // 'semester' | 'annual'
+  feeDue        Decimal  @db.Decimal(12, 2)
+  feePaid       Decimal  @db.Decimal(12, 2) @default(0)
+  advanceTaken  Decimal  @db.Decimal(12, 2) @default(0)
+  carryOver     Decimal  @db.Decimal(12, 2) @default(0) // unpaid from previous term
+  remaining     Decimal  @db.Decimal(12, 2)
+  isSnapshot    Boolean  @default(false)               // true = promotion snapshot
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("student_finance")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYMENT METHOD
+// Defines cash, bank, or online payment channels.
+// meta stores bank account number, branch, or online provider details.
+// ─────────────────────────────────────────────────────────────────────────────
+model PaymentMethod {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  type     String    // 'cash' | 'bank' | 'online'
+  meta     Json?
+  isActive Boolean   @default(true)
+  accounts Account[]
+  payments Payment[]
+  createdAt DateTime @default(now())
+
+  @@map("payment_methods")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACCOUNT
+// Bank or cash account with a running operational balance.
+// ─────────────────────────────────────────────────────────────────────────────
+model Account {
+  id              Int           @id @default(autoincrement())
+  paymentMethod   PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+  paymentMethodId Int
+  label           String        @unique
+  accountNumber   String?
+  branch          String?
+  currentBalance  Decimal       @db.Decimal(12, 2) @default(0)
+  openingBalance  Decimal       @db.Decimal(12, 2) @default(0)
+  isActive        Boolean       @default(true)
+  payments        Payment[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("accounts")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYMENT
+// Individual payment record. receiptNo generated from DB sequence.
+// ─────────────────────────────────────────────────────────────────────────────
+model Payment {
+  id            Int           @id @default(autoincrement())
+  student       Student       @relation(fields: [studentId], references: [id])
+  studentId     Int
+  amount        Decimal       @db.Decimal(12, 2)
+  date          DateTime      @default(now())
+  method        PaymentMethod @relation(fields: [methodId], references: [id])
+  methodId      Int
+  account       Account?      @relation(fields: [accountId], references: [id])
+  accountId     Int?
+  receiptNo     String        @unique
+  notes         String?
+  receiptPath   String?       // MinIO path to PDF receipt
+  allocations   PaymentAllocation[]
+  createdAt     DateTime      @default(now())
+
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYMENT ALLOCATION
+// Links a payment to one or more StudentFinance terms (FIFO or manual).
+// ─────────────────────────────────────────────────────────────────────────────
+model PaymentAllocation {
+  id               Int            @id @default(autoincrement())
+  payment          Payment        @relation(fields: [paymentId], references: [id])
+  paymentId        Int
+  studentFinanceId Int
+  allocatedAmount  Decimal        @db.Decimal(12, 2)
+  createdAt        DateTime       @default(now())
+
+  @@map("payment_allocations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT LOG
+// Immutable record of all significant mutations.
+// ─────────────────────────────────────────────────────────────────────────────
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  entity    String   // 'student'|'payment'|'department'|'session'|'account'
+  entityId  Int?
+  action    String   // 'create'|'update'|'delete'|'promote'|'payment'|'import'
+  before    Json?
+  after     Json?
+  actor     String?  @default("system")
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}

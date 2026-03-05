@@ -1,0 +1,18 @@
+FROM node:20-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y openssl libssl-dev && rm -rf /var/lib/apt/lists/*
+
+COPY package*.json ./
+COPY apps/api/package*.json ./apps/api/
+COPY apps/api/tsconfig.json ./apps/api/
+COPY prisma/ ./prisma/
+
+RUN cd apps/api && npm install --legacy-peer-deps
+
+COPY apps/api/tsconfig.json ./
+COPY apps/api/src ./apps/api/src
+
+WORKDIR /app/apps/api
+RUN npx prisma generate --schema=../../prisma/schema.prisma
+
+CMD ["npm", "run", "worker"]
