@@ -52,6 +52,7 @@ Services will be available at:
 - Node.js 20+
 - PostgreSQL 15+
 - Redis 7+
+- MinIO (or use Docker for infrastructure only)
 
 ### Setup
 
@@ -61,25 +62,64 @@ npm install
 
 # Set up environment
 cp .env.example .env
-# Edit .env with your local DB/Redis connection strings
-
-# Apply Prisma schema to database
-cd apps/api
-npx prisma migrate dev --name init
 
 # Generate Prisma client
+cd apps/api
 npx prisma generate
+
+# Apply Prisma schema to database
+npx prisma migrate dev --name init
 
 # Seed development data
 npm run db:seed
+cd ../..
 
-# Start API (port 3001)
-npm run dev
-
-# In another terminal — start frontend (port 3000)
-cd ../web
+# Start API + Frontend together
 npm run dev
 ```
+
+---
+
+## Hybrid Development (Docker Infrastructure + Local Code)
+
+**Recommended for most developers** — Use Docker for databases, run code locally for hot-reload.
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Copy environment config (IMPORTANT: Only edit the root .env file)
+cp .env.example .env
+
+# 3. Start infrastructure only (PostgreSQL, Redis, MinIO)
+npm run dev:infra
+
+# 4. Wait 5 seconds for DB to be ready, then push schema
+cd apps/api
+npx prisma db push --schema=../../prisma/schema.prisma
+
+# 5. Seed data
+npx tsx ../../prisma/seed.ts
+cd ../..
+
+# 6. Start API + Frontend (auto-syncs .env files)
+npm run dev
+
+# When done, stop infrastructure
+npm run stop:infra
+```
+
+**Services:**
+- Frontend: http://localhost:3000 (hot-reload)
+- API: http://localhost:3001/api/v1 (hot-reload)
+- PostgreSQL: localhost:5432
+- Redis: localhost:6379
+- MinIO Console: http://localhost:9001
+
+**Important Notes:**
+- Only edit `.env` in the root `/slc` directory
+- The `npm run dev` command automatically syncs `.env` to `apps/api/.env` and `apps/web/.env.local`
+- If you manually edit `.env`, run `npm run sync:env` to update subdirectories
 
 ---
 
