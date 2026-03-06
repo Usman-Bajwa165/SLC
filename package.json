@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "description": "Stars Law College Finance & Student Management System",
-  "workspaces": ["apps/*"],
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev": "npm run sync:env && concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
     "dev:infra": "docker compose up -d db redis minio",
     "dev:all": "npm run dev:infra && npm run dev",
     "sync:env": "node scripts/sync-env.js",
@@ -14,9 +18,11 @@
     "lint": "npm run lint --workspace=apps/api && npm run lint --workspace=apps/web",
     "db:migrate": "npm run db:migrate --workspace=apps/api",
     "db:studio": "npm run db:studio --workspace=apps/api",
+    "db:seed": "npm run db:seed --workspace=apps/api",
     "stop:infra": "docker compose stop db redis minio"
   },
   "devDependencies": {
+    "@types/node": "^25.3.5",
     "concurrently": "^8.2.2"
   }
 }
