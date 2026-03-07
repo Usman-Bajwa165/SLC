@@ -4,6 +4,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import TopBar from "@/components/layout/TopBar";
 import QueryProvider from "@/components/QueryProvider";
 import TopLoader, { GlobalProgressBar } from "@/components/layout/TopLoader";
+import { Toaster } from "sonner";
 import { Suspense } from "react";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <Toaster richColors position="top-right" closeButton />
         <QueryProvider>
           {/* Navigation loading bar (route changes) */}
           <Suspense fallback={null}>
@@ -30,7 +32,9 @@ export default function RootLayout({
             <Sidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
               <TopBar />
-              <main className="flex-1 overflow-y-auto p-6">{children}</main>
+              <main className="flex-1 overflow-y-auto px-6 pb-6 pt-0">
+                {children}
+              </main>
             </div>
           </div>
         </QueryProvider>

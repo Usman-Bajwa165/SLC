@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   UserPlus,
+  Wallet,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useState } from "react";
@@ -26,6 +27,7 @@ const nav = [
   { href: "/enrollment", label: "Enrollment", icon: UserPlus },
   { href: "/payments", label: "Payments", icon: CreditCard },
   { href: "/accounts", label: "Accounts", icon: Landmark },
+  { href: "/finance", label: "Finance", icon: Wallet },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/import-export", label: "Import / Export", icon: Upload },
 ];

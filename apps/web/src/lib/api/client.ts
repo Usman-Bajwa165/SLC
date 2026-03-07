@@ -61,7 +61,16 @@ export const sessionsApi = {
 
 // ── Students ──────────────────────────────────────────────────────────────────
 export const studentsApi = {
-  list: (params?: any) => get<any>("/students", params),
+  list: (params?: {
+    q?: string;
+    department?: number;
+    session?: number;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => get<any>("/students", params),
   get: (id: number) => get<any>(`/students/${id}`),
   create: (dto: any) => post<any>("/students", dto),
   update: (id: number, dto: any) => put<any>(`/students/${id}`, dto),
@@ -86,6 +95,7 @@ export const accountsApi = {
   getAccount: (id: number) => get<any>(`/accounts/${id}`),
   createAccount: (dto: any) => post<any>("/accounts", dto),
   updateAccount: (id: number, dto: any) => put<any>(`/accounts/${id}`, dto),
+  deleteAccount: (id: number) => del<any>(`/accounts/${id}`),
   ledger: (id: number, from?: string, to?: string) =>
     get<any>(`/accounts/${id}/ledger`, { from, to }),
 };
@@ -93,11 +103,29 @@ export const accountsApi = {
 // ── Reports ───────────────────────────────────────────────────────────────────
 export const reportsApi = {
   dashboard: () => get<any>("/reports/dashboard"),
-  outstanding: (params?: any) => get<any>("/reports/outstanding", params),
-  dailyReceipts: (date?: string) =>
-    get<any>("/reports/daily-receipts", { date }),
-  studentLedger: (studentId: number) =>
-    get<any>("/reports/student-ledger", { studentId }),
+  outstanding: (params?: {
+    departmentId?: number;
+    sessionId?: number;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }) => get<any>("/reports/outstanding", params),
+  dailyReceipts: (params: {
+    date: string;
+    methodId?: number;
+    accountId?: number;
+    departmentId?: number;
+    sessionId?: number;
+  }) => get<any>("/reports/daily-receipts", params),
+  studentLedger: (id: number) => get<any>(`/reports/student-ledger/${id}`),
+  accountLedger: (id: number) => get<any>(`/reports/account-ledger/${id}`),
   advanceSummary: (params?: any) =>
     get<any>("/reports/advance-summary", params),
+};
+
+// ── Finance (Other) ──────────────────────────────────────────────────────────
+export const financeApi = {
+  list: (params?: any) => get<any>("/finance/other", params),
+  create: (dto: any) => post<any>("/finance/other", dto),
+  categories: () => get<string[]>("/finance/other/categories"),
 };

@@ -1,5 +1,10 @@
-// accounts/dto/account.dto.ts
-import { IsInt, IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import {
+  IsInt,
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsBoolean,
+} from "class-validator";
 
 export class CreatePaymentMethodDto {
   @IsString() @IsNotEmpty() name: string;
@@ -13,4 +18,5 @@ export class CreateAccountDto {
   @IsString() @IsOptional() accountNumber?: string;
   @IsString() @IsOptional() branch?: string;
   @IsOptional() openingBalance?: string;
+  @IsBoolean() @IsOptional() isActive?: boolean;
 }

@@ -20,7 +20,7 @@ export default function TopBar() {
     "Stars Law College";
 
   return (
-    <header className="h-20 flex items-center justify-between px-8 relative z-10 shrink-0">
+    <header className="h-14 flex items-center justify-between px-8 relative z-10 shrink-0">
       <div className="flex flex-col">
         <h1 className="text-xl font-black text-brand-blue tracking-tight">
           {title}

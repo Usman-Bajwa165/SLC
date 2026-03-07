@@ -1,15 +1,20 @@
 import {
-  Injectable, NotFoundException, BadRequestException,
-} from '@nestjs/common';
-import { Decimal } from 'decimal.js';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { AuditService } from '../audit/audit.service';
-import { FinanceService } from '../finance/finance.service';
-import { StorageService } from '../../common/storage/storage.service';
-import { CreatePaymentDto, PaymentQueryDto } from './dto/payment.dto';
-import { paginate, paginatedResponse } from '../../common/pagination/pagination.helper';
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { Decimal } from "decimal.js";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { PrismaService } from "../../common/prisma/prisma.service";
+import { AuditService } from "../audit/audit.service";
+import { FinanceService } from "../finance/finance.service";
+import { StorageService } from "../../common/storage/storage.service";
+import { CreatePaymentDto, PaymentQueryDto } from "./dto/payment.dto";
+import {
+  paginate,
+  paginatedResponse,
+} from "../../common/pagination/pagination.helper";
 
 @Injectable()
 export class PaymentsService {
@@ -18,11 +23,20 @@ export class PaymentsService {
     private audit: AuditService,
     private finance: FinanceService,
     private storage: StorageService,
-    @InjectQueue('receipts') private receiptQueue: Queue,
+    @InjectQueue("receipts") private receiptQueue: Queue,
   ) {}
 
   async findAll(query: PaymentQueryDto) {
-    const { page = 1, limit = 20, studentId, accountId, methodId, dateFrom, dateTo } = query;
+    const {
+      page = 1,
+      limit = 20,
+      studentId,
+      accountId,
+      methodId,
+      dateFrom,
+      dateTo,
+      q,
+    } = query;
     const { skip, take } = paginate(page, limit);
 
     const where: any = {};
@@ -32,7 +46,14 @@ export class PaymentsService {
     if (dateFrom || dateTo) {
       where.date = {};
       if (dateFrom) where.date.gte = new Date(dateFrom);
-      if (dateTo) where.date.lte = new Date(dateTo + 'T23:59:59Z');
+      if (dateTo) where.date.lte = new Date(dateTo + "T23:59:59Z");
+    }
+    if (q) {
+      where.OR = [
+        { receiptNo: { contains: q, mode: "insensitive" } },
+        { student: { name: { contains: q, mode: "insensitive" } } },
+        { student: { rollNo: { contains: q, mode: "insensitive" } } },
+      ];
     }
 
     const [payments, total] = await this.prisma.$transaction([
@@ -46,7 +67,7 @@ export class PaymentsService {
           account: { select: { id: true, label: true } },
           allocations: true,
         },
-        orderBy: { date: 'desc' },
+        orderBy: { date: "desc" },
       }),
       this.prisma.payment.count({ where }),
     ]);
@@ -70,22 +91,30 @@ export class PaymentsService {
 
   async create(dto: CreatePaymentDto) {
     const amount = new Decimal(dto.amount);
-    if (amount.lte(0)) throw new BadRequestException('Payment amount must be greater than 0');
+    if (amount.lte(0))
+      throw new BadRequestException("Payment amount must be greater than 0");
 
     // Validate student
     const student = await this.prisma.student.findFirst({
       where: { id: dto.studentId, isDeleted: false },
     });
-    if (!student) throw new NotFoundException(`Student #${dto.studentId} not found`);
+    if (!student)
+      throw new NotFoundException(`Student #${dto.studentId} not found`);
 
     // Validate payment method
-    const method = await this.prisma.paymentMethod.findUnique({ where: { id: dto.methodId } });
-    if (!method) throw new NotFoundException(`Payment method #${dto.methodId} not found`);
+    const method = await this.prisma.paymentMethod.findUnique({
+      where: { id: dto.methodId },
+    });
+    if (!method)
+      throw new NotFoundException(`Payment method #${dto.methodId} not found`);
 
     // Validate account if provided
     if (dto.accountId) {
-      const account = await this.prisma.account.findUnique({ where: { id: dto.accountId } });
-      if (!account) throw new NotFoundException(`Account #${dto.accountId} not found`);
+      const account = await this.prisma.account.findUnique({
+        where: { id: dto.accountId },
+      });
+      if (!account)
+        throw new NotFoundException(`Account #${dto.accountId} not found`);
     }
 
     // Generate receipt number (atomic via DB sequence)
@@ -127,7 +156,7 @@ export class PaymentsService {
     });
 
     // 4. Audit log
-    await this.audit.log('payment', payment.id, 'payment', null, {
+    await this.audit.log("payment", payment.id, "payment", null, {
       studentId: dto.studentId,
       amount: amount.toFixed(2),
       receiptNo,
@@ -136,10 +165,14 @@ export class PaymentsService {
 
     // 5. Enqueue receipt PDF generation (async)
     try {
-      await this.receiptQueue.add('generate-receipt', { paymentId: payment.id }, {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
-      });
+      await this.receiptQueue.add(
+        "generate-receipt",
+        { paymentId: payment.id },
+        {
+          attempts: 3,
+          backoff: { type: "exponential", delay: 2000 },
+        },
+      );
     } catch (e) {
       // Queue unavailable — non-fatal, receipt can be regenerated
     }
@@ -150,7 +183,11 @@ export class PaymentsService {
   async getReceiptUrl(id: number) {
     const payment = await this.findOne(id);
     if (!payment.receiptPath) {
-      return { receiptNo: payment.receiptNo, url: null, message: 'Receipt PDF not yet generated' };
+      return {
+        receiptNo: payment.receiptNo,
+        url: null,
+        message: "Receipt PDF not yet generated",
+      };
     }
     const url = await this.storage.getPresignedUrl(payment.receiptPath);
     return { receiptNo: payment.receiptNo, url };

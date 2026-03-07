@@ -1,16 +1,26 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
+import { PrismaClient } from "@prisma/client";
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   constructor() {
     super({
-      log: process.env.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['warn', 'error'],
+      log:
+        process.env.NODE_ENV === "development"
+          ? ["query", "warn", "error"]
+          : ["warn", "error"],
     });
   }
 
   async onModuleInit() {
     await this.$connect();
+    // Ensure the receipt sequence exists
+    await this.$executeRawUnsafe(
+      `CREATE SEQUENCE IF NOT EXISTS receipt_seq START 1`,
+    );
   }
 
   async onModuleDestroy() {
@@ -23,11 +33,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
    */
   async nextReceiptNo(): Promise<string> {
     const year = new Date().getFullYear();
-    const prefix = process.env.RECEIPT_PREFIX || 'SLC';
+    const prefix = process.env.RECEIPT_PREFIX || "SLC";
     const result = await this.$queryRaw<[{ nextval: bigint }]>`
       SELECT nextval('receipt_seq')
     `;
-    const seq = result[0].nextval.toString().padStart(5, '0');
+    const seq = result[0].nextval.toString().padStart(5, "0");
     return `${prefix}-${year}-${seq}`;
   }
 }

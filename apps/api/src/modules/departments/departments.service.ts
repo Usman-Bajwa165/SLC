@@ -74,15 +74,16 @@ export class DepartmentsService {
 
   async update(id: number, dto: UpdateDepartmentDto) {
     const existing = await this.findOne(id);
+    const { feeStructures, ...data } = dto;
 
     // Check if changing config affects enrolled students
     const configChanged =
-      (dto.offersSem !== undefined && dto.offersSem !== existing.offersSem) ||
-      (dto.offersAnn !== undefined && dto.offersAnn !== existing.offersAnn) ||
-      (dto.semsPerYear !== undefined &&
-        dto.semsPerYear !== existing.semsPerYear) ||
-      (dto.yearsDuration !== undefined &&
-        dto.yearsDuration !== existing.yearsDuration);
+      (data.offersSem !== undefined && data.offersSem !== existing.offersSem) ||
+      (data.offersAnn !== undefined && data.offersAnn !== existing.offersAnn) ||
+      (data.semsPerYear !== undefined &&
+        data.semsPerYear !== existing.semsPerYear) ||
+      (data.yearsDuration !== undefined &&
+        data.yearsDuration !== existing.yearsDuration);
 
     if (configChanged) {
       const activeStudents = await this.prisma.student.count({
@@ -99,14 +100,33 @@ export class DepartmentsService {
       }
     }
 
-    const updated = await this.prisma.department.update({
-      where: { id },
-      data: dto,
-      include: { feeStructures: true },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Update department
+      await tx.department.update({
+        where: { id },
+        data,
+      });
+
+      // Update fee structures if provided
+      if (feeStructures && feeStructures.length > 0) {
+        // Delete existing fee structures
+        await tx.feeStructure.deleteMany({ where: { departmentId: id } });
+        // Create new ones
+        await tx.feeStructure.createMany({
+          data: feeStructures.map((f: any) => ({ ...f, departmentId: id })),
+        });
+      }
+
+      return tx.department.findFirst({
+        where: { id },
+        include: { feeStructures: true },
+      });
     });
 
-    await this.audit.log("department", id, "update", existing, updated);
-    return updated;
+    if (updated) {
+      await this.audit.log("department", id, "update", existing, updated);
+      return updated;
+    }
   }
 
   async remove(id: number) {

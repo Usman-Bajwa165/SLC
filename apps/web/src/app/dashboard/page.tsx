@@ -98,7 +98,7 @@ export default function DashboardPage() {
   const chartData = d.revenueTrend || [];
 
   return (
-    <div className="space-y-8 animate-fade-in p-2 max-w-[1600px] mx-auto">
+    <div className="space-y-6 animate-fade-in p-2 max-w-[1600px] mx-auto">
       {/* Header Area */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>

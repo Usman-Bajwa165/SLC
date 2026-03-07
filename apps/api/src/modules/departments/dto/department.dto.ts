@@ -19,6 +19,10 @@ export class CreateDepartmentDto {
   @MaxLength(20)
   code?: string;
 
+  @IsString()
+  @IsOptional()
+  description?: string;
+
   @IsBoolean()
   @IsOptional()
   offersSem?: boolean = false;
@@ -71,12 +75,10 @@ export class UpdateDepartmentDto {
   @IsInt()
   @Min(1)
   @IsOptional()
-  totalSemesters?: number;
-
-  @IsInt()
-  @Min(1)
-  @IsOptional()
   yearsDuration?: number;
+
+  @IsOptional()
+  feeStructures?: any[];
 }
 
 export class CreateFeeStructureDto {

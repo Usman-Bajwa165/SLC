@@ -27,17 +27,47 @@ export class StudentsService {
   ) {}
 
   async findAll(query: StudentQueryDto) {
-    const { page = 1, limit = 20, department, session, status, q } = query;
+    const {
+      page = 1,
+      limit = 20,
+      department,
+      session,
+      status,
+      q,
+      startDate,
+      endDate,
+    } = query;
     const { skip, take } = paginate(page, limit);
 
     const where: any = { isDeleted: false };
-    if (department) where.departmentId = parseInt(department);
-    if (session) where.sessionId = parseInt(session);
-    if (status) where.status = status;
-    if (q) {
+
+    const depId = department ? parseInt(department) : NaN;
+    if (!isNaN(depId)) {
+      where.departmentId = depId;
+    }
+
+    const sessId = session ? parseInt(session) : NaN;
+    if (!isNaN(sessId)) {
+      where.sessionId = sessId;
+    }
+
+    if (status && status !== "all") {
+      where.status = status;
+    }
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) where.createdAt.lte = new Date(endDate);
+    }
+
+    const search = q?.trim();
+    if (search) {
       where.OR = [
-        { name: { contains: q, mode: "insensitive" } },
-        { registrationNo: { contains: q, mode: "insensitive" } },
+        { name: { contains: search, mode: "insensitive" } },
+        { registrationNo: { contains: search, mode: "insensitive" } },
+        { rollNo: { contains: search, mode: "insensitive" } },
+        { cnic: { contains: search, mode: "insensitive" } },
       ];
     }
 

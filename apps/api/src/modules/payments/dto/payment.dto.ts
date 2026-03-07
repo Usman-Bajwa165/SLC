@@ -1,4 +1,11 @@
-import { IsInt, IsOptional, IsString, IsNotEmpty, IsDateString, IsArray } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  IsNotEmpty,
+  IsDateString,
+  IsArray,
+} from "class-validator";
 
 export class CreatePaymentDto {
   @IsInt()
@@ -43,6 +50,9 @@ export class PaymentQueryDto {
 
   @IsOptional()
   dateTo?: string;
+
+  @IsOptional()
+  q?: string;
 
   @IsOptional()
   page?: number = 1;

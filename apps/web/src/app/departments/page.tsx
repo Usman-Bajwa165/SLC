@@ -31,9 +31,11 @@ function DepartmentModal({
     code: editData?.code || "",
     description: editData?.description || "",
     programMode: editData?.offersSem ? "semester" : "annual",
-    yearsDuration: editData?.yearsDuration || "5",
-    totalSemesters: editData?.totalSemesters || "10",
-    semsPerYear: editData?.semsPerYear || "2",
+    yearsDuration: editData?.yearsDuration?.toString() || "5",
+    totalSemesters: editData?.semsPerYear && editData?.yearsDuration 
+      ? (editData.semsPerYear * editData.yearsDuration).toString()
+      : "10",
+    semsPerYear: editData?.semsPerYear?.toString() || "2",
     semFee:
       editData?.feeStructures?.find((f: any) => f.programMode === "semester")
         ?.feeAmount || "",
@@ -127,30 +129,24 @@ function DepartmentModal({
                   form.programMode === "semester"
                     ? Number(form.semsPerYear)
                     : null,
-                totalSemesters:
-                  form.programMode === "semester"
-                    ? Number(form.totalSemesters)
-                    : null,
-                ...(!isEdit && {
-                  feeStructures: [
-                    ...(form.programMode === "semester" && form.semFee
-                      ? [
-                          {
-                            programMode: "semester",
-                            feeAmount: form.semFee,
-                          },
-                        ]
-                      : []),
-                    ...(form.programMode === "annual" && form.annFee
-                      ? [
-                          {
-                            programMode: "annual",
-                            feeAmount: form.annFee,
-                          },
-                        ]
-                      : []),
-                  ],
-                }),
+                feeStructures: [
+                  ...(form.programMode === "semester" && form.semFee
+                    ? [
+                        {
+                          programMode: "semester",
+                          feeAmount: form.semFee,
+                        },
+                      ]
+                    : []),
+                  ...(form.programMode === "annual" && form.annFee
+                    ? [
+                        {
+                          programMode: "annual",
+                          feeAmount: form.annFee,
+                        },
+                      ]
+                    : []),
+                ],
               })
             }
           >
@@ -230,6 +226,19 @@ function DepartmentModal({
               onChange={(e) => set("code", e.target.value.toUpperCase())}
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2">
+            Description
+          </label>
+          <textarea
+            className="input-field !text-slate-900 font-bold resize-none"
+            placeholder="Brief description of the department (optional)"
+            rows={2}
+            value={form.description}
+            onChange={(e) => set("description", e.target.value)}
+          />
         </div>
 
         {form.programMode === "semester" ? (
@@ -461,7 +470,7 @@ export default function DepartmentsPage() {
                 <div className="mt-6 flex flex-wrap gap-2">
                   {dept.offersSem && (
                     <div className="px-3 py-1 bg-blue-50 rounded-lg text-[10px] font-bold text-blue-600 uppercase">
-                      {dept.totalSemesters} Semesters
+                      {dept.semsPerYear * dept.yearsDuration} Semesters
                     </div>
                   )}
                   {dept.offersAnn && (

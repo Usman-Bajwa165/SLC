@@ -39,6 +39,11 @@ export class CreateStudentDto {
   cnic: string;
 
   @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  contact?: string;
+
+  @IsString()
   @IsNotEmpty()
   @MaxLength(50)
   registrationNo: string;
@@ -135,6 +140,11 @@ export class UpdateStudentDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(20)
+  contact?: string;
+
+  @IsString()
+  @IsOptional()
   rollNo?: string;
 
   @IsEnum(STUDENT_STATUSES)
@@ -205,11 +215,17 @@ export class StudentQueryDto {
   status?: string;
 
   @IsOptional()
-  q?: string; // name or registrationNo search
+  q?: string; // name, registrationNo, rollNo, or cnic search
 
   @IsOptional()
   page?: number = 1;
 
   @IsOptional()
   limit?: number = 20;
+
+  @IsOptional()
+  startDate?: string;
+
+  @IsOptional()
+  endDate?: string;
 }

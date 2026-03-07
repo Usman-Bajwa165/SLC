@@ -49,7 +49,7 @@ export default function StudentsPage() {
     queryFn: () =>
       studentsApi.list({
         q: search || undefined,
-        department: dept || undefined,
+        department: dept ? Number(dept) : undefined,
         status: status || undefined,
         page,
       }),
@@ -63,7 +63,7 @@ export default function StudentsPage() {
   const meta = data?.meta;
 
   return (
-    <div className="space-y-8 animate-fade-in p-2 max-w-[1600px] mx-auto">
+    <div className="space-y-6 animate-fade-in p-2 max-w-[1600px] mx-auto">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">
@@ -248,7 +248,11 @@ export default function StudentsPage() {
                             {s.programMode}
                           </span>
                           <span className="text-[10px] font-bold text-slate-400">
-                            Sem {s.currentSemester ?? "—"}
+                            Sem{" "}
+                            {s.currentSemester !== null &&
+                            s.currentSemester !== undefined
+                              ? s.currentSemester
+                              : "—"}
                           </span>
                         </div>
                       </td>

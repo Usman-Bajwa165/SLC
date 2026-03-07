@@ -19,7 +19,7 @@ export default function PaymentsPage() {
 
   const { data: paymentsRes, isLoading } = useQuery({
     queryKey: ["payments", search],
-    queryFn: () => paymentsApi.list({ search }),
+    queryFn: () => paymentsApi.list({ q: search }),
   });
 
   const payments = paymentsRes?.data || [];
