@@ -3,6 +3,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { reportsApi } from "@/lib/api/client";
 import { cn, formatDateTime, formatCurrency } from "@/lib/utils";
+import { exportToPDF } from "@/lib/report-utils";
 import {
   ChevronLeft,
   Printer,
@@ -78,17 +79,81 @@ export default function StudentLedgerPage() {
           </button>
           <div className="flex gap-2">
             <button
+              onClick={() => {
+                exportToPDF({
+                  title: "STUDENT FINANCIAL LEDGER",
+                  filename: `Ledger_${student?.registrationNo || studentId}`,
+                  columns: ["Date", "Receipt", "Method", "Account", "Amount"],
+                  data: logs.map((l: any) => [
+                    formatDateTime(l.date),
+                    l.receiptNo || "N/A",
+                    l.method,
+                    l.account || "Cash",
+                    formatCurrency(l.amount),
+                  ]),
+                  summary: [
+                    { label: "Student", value: student?.name || "N/A" },
+                    {
+                      label: "Reg No",
+                      value: student?.registrationNo || "N/A",
+                    },
+                    {
+                      label: "Department",
+                      value: student?.department?.name || "N/A",
+                    },
+                    {
+                      label: "Total Paid",
+                      value: `PKR ${formatCurrency(totalPaid)}`,
+                    },
+                    {
+                      label: "Remaining",
+                      value: `PKR ${formatCurrency(totalRemaining)}`,
+                    },
+                  ],
+                });
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-colors shadow-sm"
+            >
+              <FileText className="w-4 h-4 text-brand-blue" /> Export PDF
+            </button>
+            <button
               onClick={() => window.print()}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-colors shadow-sm"
             >
-              <Printer className="w-4 h-4" /> Print Ledger
+              <Printer className="w-4 h-4 text-slate-400" /> Print Ledger
             </button>
           </div>
         </div>
 
+        {/* Branded Print Header */}
+        <div className="hidden print:block text-center space-y-2 mb-8 border-b-2 border-slate-900 pb-6">
+          <h1 className="text-4xl font-black tracking-tighter">
+            STARS LAW COLLEGE
+          </h1>
+          <p className="text-sm font-bold uppercase tracking-[0.3em] text-slate-500">
+            Official Student Financial Ledger
+          </p>
+          <div className="flex justify-between items-end pt-4">
+            <div className="text-left space-y-1">
+              <p className="text-[10px] font-black uppercase text-slate-400">
+                Student Name
+              </p>
+              <p className="text-lg font-black uppercase">{student?.name}</p>
+            </div>
+            <div className="text-right space-y-1">
+              <p className="text-[10px] font-black uppercase text-slate-400">
+                Registration No
+              </p>
+              <p className="text-lg font-black uppercase">
+                {student?.registrationNo}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Profile Card */}
-        <div className="card-premium p-6 md:p-8 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-8 opacity-5">
+        <div className="card-premium p-6 md:p-8 overflow-hidden relative print:border-none print:shadow-none print:p-0 print:mb-8">
+          <div className="absolute top-0 right-0 p-8 opacity-5 print:hidden">
             <FileText className="w-48 h-48 rotate-12" />
           </div>
 
@@ -271,10 +336,10 @@ export default function StudentLedgerPage() {
               </div>
             </div>
 
-            {/* Print Header Placeholder */}
-            <div className="hidden print:block text-slate-400 text-[10px] font-bold text-center italic mt-20 pt-20 border-t border-slate-100">
-              Audit generated on {new Date().toLocaleString()} • Stars Law
-              College slc Management System
+            {/* Print Footer */}
+            <div className="hidden print:block text-slate-400 text-[10px] font-bold text-center italic mt-12 pt-8 border-t border-slate-100">
+              Generated on {formatDateTime(new Date())} • Stars Law College
+              Management System
             </div>
           </div>
         </div>

@@ -9,6 +9,7 @@ import {
   sessionsApi,
 } from "@/lib/api/client";
 import { cn, formatDateTime, formatCurrency } from "@/lib/utils";
+import { exportToPDF } from "@/lib/report-utils";
 import Link from "next/link";
 import Modal from "@/components/ui/Modal";
 import {
@@ -25,6 +26,8 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Wallet,
+  Printer,
+  FileText,
 } from "lucide-react";
 
 const TABS = ["Students", "Daily Receipts", "Accounts"];
@@ -45,8 +48,8 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-1 animate-fade-in px-4 pb-1 pt-0 max-w-[1640px] mx-auto overflow-hidden">
-      <div className="flex items-end justify-between py-2 border-b border-slate-100/60">
+    <div className="h-full flex flex-col space-y-1 animate-fade-in px-4 pb-1 pt-0 max-w-[1640px] mx-auto overflow-hidden print:overflow-visible print:h-auto print:max-w-none print:px-0">
+      <div className="flex items-end justify-between py-2 border-b border-slate-100/60 print:hidden">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
             Institutional Reports
@@ -57,8 +60,8 @@ export default function ReportsPage() {
         </p>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0 card-premium overflow-hidden bg-white shadow-2xl border-slate-200/60">
-        <div className="flex border-b border-slate-100 bg-slate-50/50 p-2 gap-2">
+      <div className="flex-1 flex flex-col min-h-0 card-premium overflow-hidden bg-white shadow-2xl border-slate-200/60 print:shadow-none print:border-none print:overflow-visible">
+        <div className="flex border-b border-slate-100 bg-slate-50/50 p-2 gap-2 print:hidden">
           {TABS.map((t) => (
             <button
               key={t}
@@ -244,9 +247,9 @@ function OutstandingReport() {
   const rows = data?.rows || [];
 
   return (
-    <div className="h-full flex flex-col p-3 space-y-3 overflow-hidden">
+    <div className="h-full flex flex-col p-3 space-y-3 overflow-hidden print:p-0 print:overflow-visible print:h-auto">
       {/* Filtering Section */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-50/50 p-4 rounded-3xl border border-slate-100 print:hidden">
         <div className="md:col-span-3 relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-blue transition-colors" />
           <input
@@ -308,13 +311,69 @@ function OutstandingReport() {
             }
           />
         </div>
-        <div className="md:col-span-2 flex items-end">
+        <div className="md:col-span-3 flex gap-2">
           <a
             href={`${process.env.NEXT_PUBLIC_API_URL}/reports/outstanding/export?departmentId=${filters.departmentId}${filters.sessionId ? `&sessionId=${filters.sessionId}` : ""}`}
-            className="btn-primary flex items-center justify-center gap-2 text-xs px-4 py-2.5 w-full shadow-lg shadow-brand-blue/20"
+            download={`Students_${new Date().toISOString().split("T")[0]}.csv`}
+            className="flex-1 btn-primary flex items-center justify-center gap-2 text-[10px] px-3 py-2 shadow-lg shadow-brand-blue/20"
           >
-            <Download className="w-3.5 h-3.5" /> Export Data
+            <Download className="w-3.5 h-3.5" /> CSV
           </a>
+          <button
+            onClick={() => {
+              exportToPDF({
+                title: "STUDENT OUTSTANDING",
+                filename: "Students",
+                columns: [
+                  "Reg No",
+                  "Roll No",
+                  "Name",
+                  "CNIC",
+                  "Dept/Session",
+                  "Payable",
+                  "Paid",
+                  "Pending",
+                ],
+                data: rows.map((r: any) => [
+                  r.registrationNo,
+                  r.rollNo || "N/A",
+                  r.name,
+                  r.cnic,
+                  `${r.department} / ${r.session}`,
+                  formatCurrency(r.totalPayable),
+                  formatCurrency(r.totalPaid),
+                  formatCurrency(r.totalOutstanding),
+                ]),
+                summary: [
+                  {
+                    label: "Total Students",
+                    value: String(data?.totalCount || 0),
+                  },
+                  {
+                    label: "Total Payable",
+                    value: `PKR ${formatCurrency(data?.grandTotalPayable || 0)}`,
+                  },
+                  {
+                    label: "Total Received",
+                    value: `PKR ${formatCurrency(data?.grandTotalPaid || 0)}`,
+                  },
+                  {
+                    label: "Total Outstanding",
+                    value: `PKR ${formatCurrency(data?.grandTotalOutstanding || 0)}`,
+                  },
+                ],
+              });
+            }}
+            className="flex-1 bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-3 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
+          >
+            <FileText className="w-3.5 h-3.5" /> PDF
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="flex-1 bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-3 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
+          >
+            <Printer className="w-3.5 h-3.5" /> Print
+          </button>
         </div>
       </div>
 
@@ -632,13 +691,60 @@ function DailyReceiptsReport() {
             ))}
           </select>
         </div>
-        <div className="flex items-end">
+        <div className="flex items-end gap-2">
           <a
             href={`${process.env.NEXT_PUBLIC_API_URL}/reports/daily-receipts/export?date=${filters.date}${filters.methodId ? `&methodId=${filters.methodId}` : ""}${filters.accountId ? `&accountId=${filters.accountId}` : ""}${filters.departmentId ? `&departmentId=${filters.departmentId}` : ""}${filters.sessionId ? `&sessionId=${filters.sessionId}` : ""}`}
-            className="btn-primary flex items-center justify-center gap-2 text-sm px-6 py-3 w-full"
+            download={`Daily Receipts_${filters.date}.csv`}
+            className="flex-1 btn-primary flex items-center justify-center gap-2 text-[10px] px-3 py-2 shadow-lg shadow-brand-blue/20"
           >
-            <Download className="w-4 h-4" /> Export Receipts
+            <Download className="w-3.5 h-3.5" /> CSV
           </a>
+          <button
+            onClick={() => {
+              exportToPDF({
+                title: "DAILY RECEIPTS",
+                filename: "Daily Receipts",
+                columns: [
+                  "Receipt",
+                  "Date",
+                  "Student",
+                  "Dept/Session",
+                  "Method",
+                  "Amount",
+                  "Remaining",
+                ],
+                data: payments.map((p: any) => [
+                  p.receiptNo,
+                  formatDateTime(p.date),
+                  p.student.name,
+                  `${p.student.department?.code || ""} / ${p.student.session?.label || ""}`,
+                  p.method.name,
+                  formatCurrency(p.amount),
+                  formatCurrency(p.totalRemaining),
+                ]),
+                summary: [
+                  { label: "Report Date", value: filters.date },
+                  {
+                    label: "Total Collection",
+                    value: `PKR ${formatCurrency(data?.total || 0)}`,
+                  },
+                  {
+                    label: "Transaction Count",
+                    value: String(payments.length),
+                  },
+                ],
+              });
+            }}
+            className="flex-1 bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-3 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
+          >
+            <FileText className="w-3.5 h-3.5" /> PDF
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="flex-1 bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-3 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
+          >
+            <Printer className="w-3.5 h-3.5" /> Print
+          </button>
         </div>
       </div>
 
@@ -744,20 +850,82 @@ function AccountsReport() {
   const allAccounts = (accounts as any)?.data || accounts || [];
 
   return (
-    <div className="h-full flex flex-col p-3 space-y-3 overflow-hidden">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <SummaryCard
-          label="Total Balance"
-          value={`PKR ${formatCurrency(allAccounts.reduce((s: any, a: any) => s + Number(a.currentBalance || 0), 0))}`}
-          icon={<Landmark className="w-5 h-5" />}
-          color="blue"
-        />
-        <SummaryCard
-          label="Active Accounts"
-          value={allAccounts.length}
-          icon={<Filter className="w-5 h-5" />}
-          color="indigo"
-        />
+    <div className="h-full flex flex-col p-3 space-y-3 overflow-hidden print:p-0 print:overflow-visible print:h-auto">
+      <div className="flex items-center justify-between print:hidden">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1 mr-4">
+          <SummaryCard
+            label="Total Balance"
+            value={`PKR ${formatCurrency(allAccounts.reduce((s: any, a: any) => s + Number(a.currentBalance || 0), 0))}`}
+            icon={<Landmark className="w-5 h-5" />}
+            color="blue"
+          />
+          <SummaryCard
+            label="Active Accounts"
+            value={allAccounts.length}
+            icon={<Filter className="w-5 h-5" />}
+            color="indigo"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const headers = ["Account", "Category", "Number", "Balance"];
+              const rows = allAccounts.map((acc: any) => [
+                acc.label,
+                acc.category,
+                acc.accountNumber || "N/A",
+                acc.currentBalance,
+              ]);
+              const csvContent = [headers, ...rows]
+                .map((e) => e.join(","))
+                .join("\n");
+              const blob = new Blob([csvContent], {
+                type: "text/csv;charset=utf-8;",
+              });
+              const link = document.createElement("a");
+              link.href = URL.createObjectURL(blob);
+              link.download = `Accounts_${new Date().toISOString().split("T")[0]}.csv`;
+              link.click();
+            }}
+            className="bg-brand-blue text-white rounded-xl flex items-center justify-center gap-2 text-[10px] px-4 py-2 hover:bg-brand-blue/90 transition-colors shadow-sm font-black uppercase tracking-widest"
+          >
+            <Download className="w-4 h-4" /> CSV
+          </button>
+          <button
+            onClick={() => {
+              exportToPDF({
+                title: "FINANCIAL ACCOUNTS",
+                filename: "Accounts",
+                columns: ["Account", "Category", "Number", "Balance"],
+                data: allAccounts.map((acc: any) => [
+                  acc.label,
+                  acc.category,
+                  acc.accountNumber || "N/A",
+                  formatCurrency(acc.currentBalance),
+                ]),
+                summary: [
+                  {
+                    label: "Total Balance",
+                    value: `PKR ${formatCurrency(allAccounts.reduce((s: any, a: any) => s + Number(a.currentBalance || 0), 0))}`,
+                  },
+                  {
+                    label: "Active Accounts",
+                    value: String(allAccounts.length),
+                  },
+                ],
+              });
+            }}
+            className="bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-4 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
+          >
+            <FileText className="w-4 h-4" /> PDF
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-4 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
+          >
+            <Printer className="w-4 h-4" /> Print
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-x-auto overflow-y-auto rounded-3xl border border-slate-100 shadow-sm bg-white scrollbar-thin scrollbar-thumb-slate-200">

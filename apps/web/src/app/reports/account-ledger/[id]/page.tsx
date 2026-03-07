@@ -13,7 +13,9 @@ import {
   Wallet,
   Building,
   History,
+  FileText,
 } from "lucide-react";
+import { exportToPDF } from "@/lib/report-utils";
 
 export default function AccountLedgerPage() {
   const { id } = useParams();
@@ -67,17 +69,80 @@ export default function AccountLedgerPage() {
           </button>
           <div className="flex gap-2">
             <button
+              onClick={() => {
+                exportToPDF({
+                  title: "FINANCIAL ACCOUNT LEDGER",
+                  filename: `Account_${account?.label || accountId}`,
+                  columns: ["Date", "Description", "Category", "Amount"],
+                  data: logs.map((l: any) => [
+                    formatDateTime(l.date),
+                    l.description,
+                    l.category,
+                    `${l.type === "credit" ? "+" : "-"} PKR ${formatCurrency(l.amount)}`,
+                  ]),
+                  summary: [
+                    { label: "Account Name", value: account?.label || "N/A" },
+                    {
+                      label: "Account No",
+                      value: account?.accountNumber || "N/A",
+                    },
+                    {
+                      label: "Total Inflow",
+                      value: `PKR ${formatCurrency(totalCredits)}`,
+                    },
+                    {
+                      label: "Total Outflow",
+                      value: `PKR ${formatCurrency(totalDebits)}`,
+                    },
+                    {
+                      label: "Current Balance",
+                      value: `PKR ${formatCurrency(account?.currentBalance || 0)}`,
+                    },
+                  ],
+                });
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-colors shadow-sm"
+            >
+              <FileText className="w-4 h-4 text-brand-blue" /> Export PDF
+            </button>
+            <button
               onClick={() => window.print()}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-colors shadow-sm"
             >
-              <Printer className="w-4 h-4" /> Print Ledger
+              <Printer className="w-4 h-4 text-slate-400" /> Print Ledger
             </button>
           </div>
         </div>
 
+        {/* Branded Print Header */}
+        <div className="hidden print:block text-center space-y-2 mb-8 border-b-2 border-slate-900 pb-6">
+          <h1 className="text-4xl font-black tracking-tighter">
+            STARS LAW COLLEGE
+          </h1>
+          <p className="text-sm font-bold uppercase tracking-[0.3em] text-slate-500">
+            Official Financial Account Ledger
+          </p>
+          <div className="flex justify-between items-end pt-4">
+            <div className="text-left space-y-1">
+              <p className="text-[10px] font-black uppercase text-slate-400">
+                Account Label
+              </p>
+              <p className="text-lg font-black uppercase">{account?.label}</p>
+            </div>
+            <div className="text-right space-y-1">
+              <p className="text-[10px] font-black uppercase text-slate-400">
+                Account Number
+              </p>
+              <p className="text-base font-black uppercase">
+                {account?.accountNumber || "N/A"}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Account Summary Header */}
-        <div className="card-premium p-6 md:p-8 overflow-hidden relative border-l-4 border-l-brand-blue">
-          <div className="absolute top-0 right-0 p-8 opacity-5">
+        <div className="card-premium p-6 md:p-8 overflow-hidden relative border-l-4 border-l-brand-blue print:border-none print:shadow-none print:p-0">
+          <div className="absolute top-0 right-0 p-8 opacity-5 print:hidden">
             <History className="w-48 h-48 rotate-12" />
           </div>
 
@@ -236,9 +301,9 @@ export default function AccountLedgerPage() {
         </div>
 
         {/* Footer */}
-        <div className="hidden print:block text-slate-400 text-[10px] font-bold text-center italic mt-20 pt-20 border-t border-slate-100">
-          Account audit generated on {new Date().toLocaleString()} • Stars Law
-          College slc Management System
+        <div className="hidden print:block text-slate-400 text-[10px] font-bold text-center italic mt-12 pt-8 border-t border-slate-100">
+          Generated on {formatDateTime(new Date())} • Stars Law College
+          Management System
         </div>
       </div>
     </div>

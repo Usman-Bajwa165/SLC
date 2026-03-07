@@ -28,11 +28,15 @@ export default function RootLayout({
           </Suspense>
           {/* Query loading bar (all fetches & mutations) */}
           <GlobalProgressBar />
-          <div className="flex h-screen bg-surface overflow-hidden">
-            <Sidebar />
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <TopBar />
-              <main className="flex-1 overflow-y-auto px-6 pb-6 pt-0">
+          <div className="flex h-screen bg-surface overflow-hidden print:h-auto print:overflow-visible print:bg-white">
+            <div className="print:hidden h-full">
+              <Sidebar />
+            </div>
+            <div className="flex-1 flex flex-col overflow-hidden print:overflow-visible">
+              <div className="print:hidden">
+                <TopBar />
+              </div>
+              <main className="flex-1 overflow-y-auto px-6 pb-6 pt-0 print:p-0 print:overflow-visible">
                 {children}
               </main>
             </div>
