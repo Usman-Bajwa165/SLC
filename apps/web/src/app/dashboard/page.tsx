@@ -94,16 +94,8 @@ export default function DashboardPage() {
 
   const d = data || {};
 
-  // Mock data for charts if API doesn't provide enough history yet
-  const chartData = [
-    { name: "Mon", amount: 45000 },
-    { name: "Tue", amount: 52000 },
-    { name: "Wed", amount: 38000 },
-    { name: "Thu", amount: 65000 },
-    { name: "Fri", amount: 48000 },
-    { name: "Sat", amount: 12000 },
-    { name: "Sun", amount: 5000 },
-  ];
+  // Extract trend data from API or fall back to empty
+  const chartData = d.revenueTrend || [];
 
   return (
     <div className="space-y-8 animate-fade-in p-2 max-w-[1600px] mx-auto">

@@ -1,16 +1,15 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { paymentsApi } from "@/lib/api/client";
+import { showBar, hideBar } from "@/lib/progress";
 import {
   CreditCard,
   Search,
   Filter,
-  ArrowUpRight,
   Printer,
   FileText,
   Download,
   CheckCircle,
-  Clock,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useState } from "react";
@@ -52,11 +51,27 @@ export default function PaymentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="btn-secondary flex items-center gap-2 group">
+          <button
+            className="btn-secondary flex items-center gap-2 group"
+            onClick={async () => {
+              showBar();
+              await new Promise((r) => setTimeout(r, 800));
+              hideBar();
+            }}
+          >
             <Download className="w-4 h-4" />
             Export CSV
           </button>
-          <button className="btn-primary flex items-center gap-2 group">
+          <button
+            className="btn-primary flex items-center gap-2 group"
+            onClick={() => {
+              showBar();
+              setTimeout(() => {
+                hideBar();
+                window.print();
+              }, 400);
+            }}
+          >
             <Printer className="w-4 h-4" />
             Print Daily Summary
           </button>

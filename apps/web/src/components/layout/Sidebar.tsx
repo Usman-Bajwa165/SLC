@@ -13,6 +13,7 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  UserPlus,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useState } from "react";
@@ -22,6 +23,7 @@ const nav = [
   { href: "/departments", label: "Departments", icon: Building2 },
   { href: "/sessions", label: "Sessions", icon: Calendar },
   { href: "/students", label: "Students", icon: Users },
+  { href: "/enrollment", label: "Enrollment", icon: UserPlus },
   { href: "/payments", label: "Payments", icon: CreditCard },
   { href: "/accounts", label: "Accounts", icon: Landmark },
   { href: "/reports", label: "Reports", icon: BarChart3 },
@@ -39,7 +41,7 @@ export default function Sidebar() {
         isCollapsed ? "w-20" : "w-72",
       )}
     >
-      {/* Collapse Toggle Button */}
+      {/* Collapse Toggle */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="absolute -right-3 top-10 w-6 h-6 bg-brand-gold rounded-full flex items-center justify-center text-white border-2 border-brand-blue-dark shadow-lg z-30 hover:scale-110 transition-transform"
@@ -51,9 +53,9 @@ export default function Sidebar() {
         )}
       </button>
 
-      {/* Decorative gradient overlay */}
+      {/* Decorative glow */}
       {!isCollapsed && (
-        <div className="absolute top-0 right-0 w-32 h-32 bg-brand-gold/10 blur-3xl rounded-full -mr-16 -mt-16" />
+        <div className="absolute top-0 right-0 w-32 h-32 bg-brand-gold/10 blur-3xl rounded-full -mr-16 -mt-16 pointer-events-none" />
       )}
 
       {/* Logo */}
@@ -61,16 +63,14 @@ export default function Sidebar() {
         <div className="flex items-center gap-4">
           <div
             className={clsx(
-              "bg-gold-gradient rounded-2xl flex items-center justify-center shadow-lg shadow-brand-gold/20 transform transition-all duration-300",
-              isCollapsed
-                ? "w-12 h-12 rotate-0"
-                : "w-12 h-12 rotate-3 hover:rotate-0",
+              "bg-gold-gradient rounded-2xl flex items-center justify-center shadow-lg shadow-brand-gold/20 transform transition-all duration-300 flex-shrink-0",
+              isCollapsed ? "w-12 h-12" : "w-12 h-12 rotate-3 hover:rotate-0",
             )}
           >
             <BookOpen className="w-6 h-6 text-white" />
           </div>
           {!isCollapsed && (
-            <div className="animate-fade-in">
+            <div className="animate-fade-in min-w-0">
               <div className="text-white font-black text-lg tracking-tight leading-none uppercase">
                 Stars Law
               </div>
@@ -82,10 +82,9 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Nav */}
       <nav
         className={clsx(
-          "flex-1 py-6 space-y-1.5 overflow-y-auto relative scrollbar-hide",
+          "flex-1 py-4 space-y-1 overflow-y-auto relative",
           isCollapsed ? "px-2" : "px-4",
         )}
       >
@@ -95,25 +94,28 @@ export default function Sidebar() {
             <Link
               key={href}
               href={href}
-              className={clsx(
-                "group flex items-center rounded-xl text-sm font-semibold transition-all duration-300 relative overflow-hidden",
-                isCollapsed ? "justify-center p-3" : "gap-3.5 px-4 py-3",
-                active
-                  ? "bg-white/10 text-brand-gold-light"
-                  : "text-slate-400 hover:text-white hover:bg-white/5",
-              )}
               title={isCollapsed ? label : ""}
-            >
-              {active && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-gold-light rounded-r-lg" />
+              className={clsx(
+                "group relative flex items-center rounded-xl text-sm font-bold transition-all duration-150 overflow-hidden",
+                isCollapsed ? "justify-center p-3" : "gap-3 px-4 py-2.5",
+                active
+                  ? "bg-brand-gold text-slate-900 shadow-lg shadow-brand-gold/30"
+                  : "text-blue-200 hover:text-white hover:bg-white/10 active:bg-brand-gold/80 active:text-slate-900",
               )}
+            >
               <Icon
                 className={clsx(
-                  "w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110",
-                  active ? "text-brand-gold-light" : "text-slate-50",
+                  "w-5 h-5 flex-shrink-0 transition-transform duration-150",
+                  active
+                    ? "text-slate-900"
+                    : "text-blue-200 group-hover:text-white group-hover:scale-105",
                 )}
               />
-              {!isCollapsed && <span className="truncate">{label}</span>}
+              {!isCollapsed && (
+                <span className="truncate tracking-wide uppercase text-xs">
+                  {label}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -122,7 +124,7 @@ export default function Sidebar() {
       {/* Footer */}
       <div
         className={clsx(
-          "py-6 border-t border-white/5 bg-black/20",
+          "py-5 border-t border-white/5 bg-black/20",
           isCollapsed ? "px-2 text-center" : "px-8",
         )}
       >
@@ -134,7 +136,7 @@ export default function Sidebar() {
           )}
           <div
             className={clsx(
-              "w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-sm shadow-green-500/50",
+              "w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-sm shadow-green-400/60",
               isCollapsed && "mx-auto",
             )}
           />

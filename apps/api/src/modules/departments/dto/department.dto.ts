@@ -1,6 +1,12 @@
 import {
-  IsString, IsBoolean, IsOptional, IsInt, Min, IsNotEmpty, MaxLength,
-} from 'class-validator';
+  IsString,
+  IsBoolean,
+  IsOptional,
+  IsInt,
+  Min,
+  IsNotEmpty,
+  MaxLength,
+} from "class-validator";
 
 export class CreateDepartmentDto {
   @IsString()
@@ -9,9 +15,9 @@ export class CreateDepartmentDto {
   name: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(20)
-  code: string;
+  code?: string;
 
   @IsBoolean()
   @IsOptional()
@@ -30,12 +36,24 @@ export class CreateDepartmentDto {
   @Min(1)
   @IsOptional()
   yearsDuration?: number;
+
+  @IsOptional()
+  feeStructures?: any[];
 }
 
 export class UpdateDepartmentDto {
   @IsString()
   @IsOptional()
   name?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  code?: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
 
   @IsBoolean()
   @IsOptional()
@@ -49,6 +67,11 @@ export class UpdateDepartmentDto {
   @Min(1)
   @IsOptional()
   semsPerYear?: number;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  totalSemesters?: number;
 
   @IsInt()
   @Min(1)

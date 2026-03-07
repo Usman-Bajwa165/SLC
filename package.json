@@ -7,10 +7,10 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run sync:env && concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
+    "dev": "kill-port 3000 3001 && npm run sync:env && concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
-    "dev:infra": "docker compose up -d db redis minio",
+    "dev:infra": "kill-port 3000 3001 && docker compose up -d db redis minio",
     "dev:all": "npm run dev:infra && npm run dev",
     "sync:env": "node scripts/sync-env.js",
     "build": "npm run build --workspace=apps/api && npm run build --workspace=apps/web",
@@ -24,5 +24,9 @@
   "devDependencies": {
     "@types/node": "^25.3.5",
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "kill-port": "^2.0.1",
+    "nprogress": "^0.2.0"
   }
 }

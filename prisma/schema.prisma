@@ -18,7 +18,7 @@ datasource db {
 model Department {
   id            Int            @id @default(autoincrement())
   name          String
-  code          String         @unique
+  code          String?        @unique
   offersSem     Boolean        @default(false)
   offersAnn     Boolean        @default(false)
   semsPerYear   Int?           // Required if offersSem = true
@@ -88,6 +88,8 @@ model Student {
   enrolledAt      DateTime?
   cgpa            Float?
   sgpa            Float?
+  obtainedMarks   Float?
+  totalMarks      Float?
   status          String           @default("active") // 'active'|'promoted'|'graduated'|'left'
   version         Int              @default(0)        // optimistic concurrency
   isDeleted       Boolean          @default(false)
@@ -176,6 +178,7 @@ model Payment {
   account       Account?      @relation(fields: [accountId], references: [id])
   accountId     Int?
   receiptNo     String        @unique
+  senderName    String?       // For Bank/Online transfers
   notes         String?
   receiptPath   String?       // MinIO path to PDF receipt
   allocations   PaymentAllocation[]

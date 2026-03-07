@@ -39,6 +39,10 @@
     @apply w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-brand-blue/5 focus:border-brand-blue/40 transition-all;
   }
 
+  .input-field {
+    @apply w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-brand-blue/5 focus:border-brand-blue/40 transition-all;
+  }
+
   .table-header-premium {
     @apply bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider py-4 px-6;
   }
@@ -47,5 +51,45 @@
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes scale-up {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-scale-up {
+  animation: scale-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
+}
+
+.animate-fade-in {
+  @apply animate-[fade-in_0.3s_ease-out_forwards];
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

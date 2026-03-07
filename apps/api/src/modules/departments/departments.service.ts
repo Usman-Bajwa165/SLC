@@ -3,10 +3,14 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
-} from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { AuditService } from '../audit/audit.service';
-import { CreateDepartmentDto, UpdateDepartmentDto, CreateFeeStructureDto } from './dto/department.dto';
+} from "@nestjs/common";
+import { PrismaService } from "../../common/prisma/prisma.service";
+import { AuditService } from "../audit/audit.service";
+import {
+  CreateDepartmentDto,
+  UpdateDepartmentDto,
+  CreateFeeStructureDto,
+} from "./dto/department.dto";
 
 @Injectable()
 export class DepartmentsService {
@@ -22,7 +26,7 @@ export class DepartmentsService {
         feeStructures: true,
         _count: { select: { students: true, sessions: true } },
       },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
   }
 
@@ -30,8 +34,8 @@ export class DepartmentsService {
     const dept = await this.prisma.department.findFirst({
       where: { id, isDeleted: false },
       include: {
-        feeStructures: { orderBy: { createdAt: 'desc' } },
-        sessions: { orderBy: { startYear: 'desc' } },
+        feeStructures: { orderBy: { createdAt: "desc" } },
+        sessions: { orderBy: { startYear: "desc" } },
         _count: { select: { students: true } },
       },
     });
@@ -42,11 +46,29 @@ export class DepartmentsService {
   async create(dto: CreateDepartmentDto) {
     this.validateDepartmentConfig(dto);
 
-    const existing = await this.prisma.department.findFirst({ where: { code: dto.code } });
-    if (existing) throw new ConflictException(`Department code '${dto.code}' already exists`);
+    const { feeStructures, ...data } = dto;
 
-    const dept = await this.prisma.department.create({ data: dto });
-    await this.audit.log('department', dept.id, 'create', null, dept);
+    if (data.code) {
+      const existing = await this.prisma.department.findFirst({
+        where: { code: data.code },
+      });
+      if (existing)
+        throw new ConflictException(
+          `Department code '${data.code}' already exists`,
+        );
+    }
+
+    const dept = await this.prisma.department.create({
+      data: {
+        ...data,
+        feeStructures:
+          feeStructures && feeStructures.length > 0
+            ? { create: feeStructures }
+            : undefined,
+      },
+      include: { feeStructures: true },
+    });
+    await this.audit.log("department", dept.id, "create", null, dept);
     return dept;
   }
 
@@ -57,12 +79,14 @@ export class DepartmentsService {
     const configChanged =
       (dto.offersSem !== undefined && dto.offersSem !== existing.offersSem) ||
       (dto.offersAnn !== undefined && dto.offersAnn !== existing.offersAnn) ||
-      (dto.semsPerYear !== undefined && dto.semsPerYear !== existing.semsPerYear) ||
-      (dto.yearsDuration !== undefined && dto.yearsDuration !== existing.yearsDuration);
+      (dto.semsPerYear !== undefined &&
+        dto.semsPerYear !== existing.semsPerYear) ||
+      (dto.yearsDuration !== undefined &&
+        dto.yearsDuration !== existing.yearsDuration);
 
     if (configChanged) {
       const activeStudents = await this.prisma.student.count({
-        where: { departmentId: id, isDeleted: false, status: 'active' },
+        where: { departmentId: id, isDeleted: false, status: "active" },
       });
       if (activeStudents > 0) {
         // Return migration warning info — client will show the migration modal
@@ -78,24 +102,37 @@ export class DepartmentsService {
     const updated = await this.prisma.department.update({
       where: { id },
       data: dto,
+      include: { feeStructures: true },
     });
-    await this.audit.log('department', id, 'update', existing, updated);
+
+    await this.audit.log("department", id, "update", existing, updated);
     return updated;
   }
 
   async remove(id: number) {
     const existing = await this.findOne(id);
+
     const studentCount = await this.prisma.student.count({
       where: { departmentId: id, isDeleted: false },
     });
     if (studentCount > 0) {
-      throw new BadRequestException(`Cannot delete department with ${studentCount} enrolled student(s).`);
+      throw new BadRequestException(
+        `Cannot delete department with ${studentCount} enrolled student(s).`,
+      );
+    }
+    const sessionCount = await this.prisma.session.count({
+      where: { departmentId: id },
+    });
+    if (sessionCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete department with ${sessionCount} linked session(s). Delete sessions first.`,
+      );
     }
     const updated = await this.prisma.department.update({
       where: { id },
       data: { isDeleted: true },
     });
-    await this.audit.log('department', id, 'delete', existing, null);
+    await this.audit.log("department", id, "delete", existing, null);
     return updated;
   }
 
@@ -105,14 +142,14 @@ export class DepartmentsService {
     await this.findOne(departmentId);
     return this.prisma.feeStructure.findMany({
       where: { departmentId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
   async createFeeStructure(dto: CreateFeeStructureDto) {
     await this.findOne(dto.departmentId);
     const fs = await this.prisma.feeStructure.create({ data: dto });
-    await this.audit.log('fee_structure', fs.id, 'create', null, fs);
+    await this.audit.log("fee_structure", fs.id, "create", null, fs);
     return fs;
   }
 
@@ -129,7 +166,7 @@ export class DepartmentsService {
           { effectiveFrom: { lte: now }, effectiveTo: { gte: now } },
         ],
       },
-      orderBy: { effectiveFrom: 'desc' },
+      orderBy: { effectiveFrom: "desc" },
     });
   }
 
@@ -137,22 +174,42 @@ export class DepartmentsService {
     const dept = await this.findOne(id);
     const students = await this.prisma.student.findMany({
       where: { departmentId: id, isDeleted: false },
-      select: { id: true, name: true, registrationNo: true, programMode: true, currentSemester: true, status: true },
+      select: {
+        id: true,
+        name: true,
+        registrationNo: true,
+        programMode: true,
+        currentSemester: true,
+        status: true,
+      },
     });
     return { department: dept, affectedStudents: students };
   }
 
-  private validateDepartmentConfig(dto: CreateDepartmentDto | UpdateDepartmentDto) {
-    if ('offersSem' in dto && dto.offersSem) {
-      if (!dto.semsPerYear) throw new BadRequestException('semsPerYear is required when offersSem is true');
-      if (!dto.yearsDuration) throw new BadRequestException('yearsDuration is required when offersSem is true');
+  private validateDepartmentConfig(
+    dto: CreateDepartmentDto | UpdateDepartmentDto,
+  ) {
+    if ("offersSem" in dto && dto.offersSem) {
+      if (!dto.semsPerYear)
+        throw new BadRequestException(
+          "semsPerYear is required when offersSem is true",
+        );
+      if (!dto.yearsDuration)
+        throw new BadRequestException(
+          "yearsDuration is required when offersSem is true",
+        );
     }
-    if ('offersAnn' in dto && dto.offersAnn) {
-      if (!dto.yearsDuration) throw new BadRequestException('yearsDuration is required when offersAnn is true');
+    if ("offersAnn" in dto && dto.offersAnn) {
+      if (!dto.yearsDuration)
+        throw new BadRequestException(
+          "yearsDuration is required when offersAnn is true",
+        );
     }
-    if ('offersSem' in dto && 'offersAnn' in dto) {
+    if ("offersSem" in dto && "offersAnn" in dto) {
       if (!dto.offersSem && !dto.offersAnn) {
-        throw new BadRequestException('Department must offer at least one program mode (semester or annual)');
+        throw new BadRequestException(
+          "Department must offer at least one program mode (semester or annual)",
+        );
       }
     }
   }
