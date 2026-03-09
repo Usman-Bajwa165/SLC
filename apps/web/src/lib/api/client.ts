@@ -17,21 +17,31 @@ api.interceptors.response.use(
 );
 
 // ── Helper to unwrap { data } wrapper ────────────────────────────────────────
+const unwrap = (res: any) => {
+  const data = res.data;
+  // If the response is paginated (has both data and meta), return the whole thing
+  if (data && typeof data === "object" && "data" in data && "meta" in data) {
+    return data;
+  }
+  // Otherwise unwrap the data field if it exists
+  return data?.data ?? data;
+};
+
 const get = async <T>(url: string, params?: any): Promise<T> => {
   const res = await api.get(url, { params });
-  return res.data?.data ?? res.data;
+  return unwrap(res);
 };
 const post = async <T>(url: string, body: any): Promise<T> => {
   const res = await api.post(url, body);
-  return res.data?.data ?? res.data;
+  return unwrap(res);
 };
 const put = async <T>(url: string, body: any): Promise<T> => {
   const res = await api.put(url, body);
-  return res.data?.data ?? res.data;
+  return unwrap(res);
 };
 const del = async <T>(url: string): Promise<T> => {
   const res = await api.delete(url);
-  return res.data?.data ?? res.data;
+  return unwrap(res);
 };
 
 // ── Departments ───────────────────────────────────────────────────────────────
