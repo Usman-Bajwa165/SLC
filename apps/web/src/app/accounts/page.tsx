@@ -7,6 +7,7 @@ import Modal from "@/components/ui/Modal";
 import { Landmark, Wallet, ArrowUpRight, Plus, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { clsx } from "clsx";
+import { showBar, hideBar } from "@/lib/progress";
 
 function AddAccountModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
@@ -212,6 +213,7 @@ function AddAccountModal({ onClose }: { onClose: () => void }) {
 
 import { Trash2, History } from "lucide-react";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { reportsApi } from "@/lib/api/client";
 
 function AccountLedgerModal({ accountId }: { accountId: number }) {
   const { data, isLoading } = useQuery({
@@ -236,6 +238,7 @@ function AccountLedgerModal({ accountId }: { accountId: number }) {
             <tr>
               <th className="px-5 py-4 text-left">Date / Ref</th>
               <th className="px-5 py-4 text-left">Description</th>
+              <th className="px-5 py-4 text-left">From</th>
               <th className="px-5 py-4 text-left">Category</th>
               <th className="px-5 py-4 text-right">Amount</th>
             </tr>
@@ -244,7 +247,7 @@ function AccountLedgerModal({ accountId }: { accountId: number }) {
             {logs.length === 0 ? (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={5}
                   className="px-5 py-10 text-center text-slate-400 italic"
                 >
                   No activity recorded for this account.
@@ -267,6 +270,11 @@ function AccountLedgerModal({ accountId }: { accountId: number }) {
                   <td className="px-5 py-4">
                     <p className="font-medium text-slate-900">
                       {l.description}
+                    </p>
+                  </td>
+                  <td className="px-5 py-4">
+                    <p className="font-medium text-slate-700">
+                      {l.senderName || "-"}
                     </p>
                   </td>
                   <td className="px-5 py-4">
@@ -305,6 +313,7 @@ function ManageAccountModal({
     accountNumber: account.accountNumber || "",
     branch: account.branch || "",
     paymentMethodId: account.paymentMethodId || account.paymentMethod?.id,
+    currentBalance: account.currentBalance || 0,
   });
 
   const { data: methods } = useQuery({
@@ -346,7 +355,7 @@ function ManageAccountModal({
         <div className="flex gap-3 w-full">
           <button
             onClick={() => {
-              if (balance !== 0) {
+              if (Number(form.currentBalance) !== 0) {
                 toast.error("Account must have balance 0 to be deleted");
                 return;
               }
@@ -384,7 +393,7 @@ function ManageAccountModal({
               Current Balance
             </p>
             <p className="text-xl font-black text-slate-900">
-              PKR {formatCurrency(balance)}
+              PKR {formatCurrency(Number(form.currentBalance))}
             </p>
           </div>
           <div className="p-4 bg-brand-blue/5 rounded-3xl border border-brand-blue/10 text-center flex flex-col justify-center">
@@ -410,11 +419,13 @@ function ManageAccountModal({
               }
             >
               <option value="">Select Category</option>
-              {methods?.map((m: any) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ({m.type.toUpperCase()})
-                </option>
-              ))}
+              {methods
+                ?.filter((m: any) => m.type !== "cash")
+                .map((m: any) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.type.toUpperCase()})
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -457,6 +468,22 @@ function ManageAccountModal({
               />
             </div>
           </div>
+          <div>
+            <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2 px-1">
+              Current Balance (PKR)
+            </label>
+            <input
+              type="number"
+              className="input-field !text-slate-900 font-bold bg-white"
+              value={form.currentBalance}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  currentBalance: Number(e.target.value),
+                }))
+              }
+            />
+          </div>
         </div>
       </div>
     </Modal>
@@ -475,6 +502,7 @@ export default function AccountsPage() {
     initialTab,
   );
   const setActiveTab = (t: "all" | "bank" | "online") => {
+    showBar();
     setActiveTabState(t);
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", t);
@@ -483,14 +511,20 @@ export default function AccountsPage() {
   const [manageAccount, setManageAccount] = useState<any | null>(null);
   const [ledgerAccountId, setLedgerAccountId] = useState<number | null>(null);
 
-  const { data: accountsRaw, isLoading } = useQuery({
+  const { data: accountsRaw, isLoading: isAccountsLoading } = useQuery({
     queryKey: ["accounts"],
     queryFn: accountsApi.accounts,
   });
 
-  const accounts = (accountsRaw as any)?.data || accountsRaw || [];
+  const { data: dashboardRaw, isLoading: isDashboardLoading } = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: reportsApi.dashboard,
+  });
 
-  if (isLoading) {
+  const accounts = (accountsRaw as any)?.data || accountsRaw || [];
+  const dashboard = dashboardRaw || {};
+
+  if (isAccountsLoading || isDashboardLoading) {
     return (
       <div className="space-y-6 animate-pulse p-2 mx-auto max-w-[1600px]">
         <div className="h-40 bg-slate-100 rounded-[2rem]" />
@@ -513,8 +547,12 @@ export default function AccountsPage() {
     0,
   );
 
+  const cashBalance = Number(dashboard.cashBalance || 0);
+  const bankBalance = Number(dashboard.bankBalance || 0);
+  const onlineBalance = Number(dashboard.onlineBalance || 0);
+
   return (
-    <div className="space-y-8 animate-fade-in p-2 max-w-[1600px] mx-auto">
+    <div className="flex flex-col h-screen overflow-hidden">
       {showAdd && <AddAccountModal onClose={() => setShowAdd(false)} />}
       {manageAccount && (
         <ManageAccountModal
@@ -531,64 +569,93 @@ export default function AccountsPage() {
         {ledgerAccountId && <AccountLedgerModal accountId={ledgerAccountId} />}
       </Modal>
 
-      <div className="relative group">
-        <div className="absolute -inset-1 bg-gradient-to-r from-brand-blue/20 to-brand-gold/20 rounded-[2.5rem] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-        <div className="relative card-premium p-8 bg-slate-900 overflow-hidden min-h-[220px] flex flex-col justify-center">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-brand-gold/10 blur-[100px] rounded-full -mr-32 -mt-32 animate-pulse" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-brand-blue/10 blur-[80px] rounded-full -ml-32 -mb-32" />
+      <div className="flex-shrink-0 space-y-8 animate-fade-in p-2 max-w-[1600px] mx-auto w-full">
+        <div className="relative group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-brand-blue/20 to-brand-gold/20 rounded-[2.5rem] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+          <div className="relative card-premium p-6 bg-slate-900 overflow-hidden min-h-[140px] flex flex-col justify-center">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-brand-gold/10 blur-[100px] rounded-full -mr-32 -mt-32 animate-pulse" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-brand-blue/10 blur-[80px] rounded-full -ml-32 -mb-32" />
 
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 relative z-10">
-            <div>
-              <h2 className="text-4xl font-black text-white tracking-tight mb-2">
-                Financial Accounts
-              </h2>
-              <p className="text-slate-400 font-medium max-w-md">
-                Institutional liquidity and payment method management with
-                real-time balance tracking.
-              </p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 relative z-10">
+              <div>
+                <h2 className="text-4xl font-black text-white tracking-tight mb-2">
+                  Financial Accounts
+                </h2>
+                <p className="text-slate-400 font-medium">
+                  Institutional liquidity and payment method management with real-time balance tracking.
+                </p>
+              </div>
+              <div className="flex flex-col items-end">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-gold mb-2">
+                  Total Combined Liquidity
+                </p>
+                <p className="text-5xl font-black text-white">
+                  <span className="text-brand-gold/60 text-xl align-top mr-1">
+                    PKR
+                  </span>
+                  {formatCurrency(totalBalance)}
+                </p>
+              </div>
             </div>
-            <div className="flex flex-col items-end">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-gold mb-2">
-                Total Combined Liquidity
-              </p>
-              <p className="text-5xl font-black text-white">
-                <span className="text-brand-gold/60 text-xl align-top mr-1">
-                  PKR
-                </span>
-                {formatCurrency(totalBalance)}
-              </p>
+
+            <div className="grid grid-cols-3 gap-4 mt-6 relative z-10 border-t border-brand-blue/20 pt-4">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1">
+                  Cash in Hand
+                </p>
+                <p className="text-xl font-bold text-white">
+                  PKR {formatCurrency(cashBalance)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1">
+                  Bank Accounts
+                </p>
+                <p className="text-xl font-bold text-white">
+                  PKR {formatCurrency(bankBalance)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1">
+                  Online Wallets
+                </p>
+                <p className="text-xl font-bold text-white">
+                  PKR {formatCurrency(onlineBalance)}
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex bg-slate-100 p-1 rounded-2xl gap-1">
-          {["all", "bank", "online"].map((t) => (
-            <button
-              key={t}
-              onClick={() => setActiveTab(t as any)}
-              className={clsx(
-                "px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                activeTab === t
-                  ? "bg-white text-brand-blue shadow-sm"
-                  : "text-slate-400 hover:text-slate-600",
-              )}
-            >
-              {t}
-            </button>
-          ))}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex bg-slate-100 p-1 rounded-2xl gap-1">
+            {["all", "bank", "online"].map((t) => (
+              <button
+                key={t}
+                onClick={() => setActiveTab(t as any)}
+                className={clsx(
+                  "px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                  activeTab === t
+                    ? "bg-white text-brand-blue shadow-sm"
+                    : "text-slate-400 hover:text-slate-600",
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="btn-primary flex items-center gap-2 group w-full md:w-auto px-8 py-3.5 shadow-lg shadow-brand-blue/20"
+          >
+            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />{" "}
+            Add New Account
+          </button>
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="btn-primary flex items-center gap-2 group w-full md:w-auto px-8 py-3.5 shadow-lg shadow-brand-blue/20"
-        >
-          <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />{" "}
-          Add New Account
-        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="flex-1 overflow-y-auto p-2 max-w-[1600px] mx-auto w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
         {filteredAccounts.map((acc: any) => {
           const type = acc.paymentMethod?.type || "cash";
           const isBank = type === "bank";
@@ -691,6 +758,7 @@ export default function AccountsPage() {
             </p>
           </div>
         </button>
+        </div>
       </div>
     </div>
   );

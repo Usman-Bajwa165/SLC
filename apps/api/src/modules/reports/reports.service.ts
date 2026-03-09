@@ -261,6 +261,7 @@ export class ReportsService {
         description: `Payment from ${p.student?.name || "Unknown Student"}`,
         amount: p.amount,
         reference: p.receiptNo,
+        senderName: p.senderName,
       })),
       ...otherItems.map((t) => ({
         id: `t-${t.id}`,
@@ -270,6 +271,7 @@ export class ReportsService {
         description: t.notes || "No description",
         amount: t.amount,
         reference: null,
+        senderName: t.type === "income" ? t.senderName : t.receiverName,
       })),
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -318,23 +320,60 @@ export class ReportsService {
   async dashboardSummary() {
     const today = dayjs().startOf("day").toDate();
     const todayEnd = dayjs().endOf("day").toDate();
+    const last7Days = dayjs().subtract(6, "days").startOf("day").toDate();
 
-    const [totalStudents, todayPayments, outstandingFinance, accounts] =
-      await this.prisma.$transaction([
-        this.prisma.student.count({
-          where: { isDeleted: false, status: "active" },
-        }),
-        this.prisma.payment.findMany({
-          where: { date: { gte: today, lte: todayEnd } },
-        }),
-        this.prisma.studentFinance.findMany({
-          where: { isSnapshot: false, remaining: { gt: 0 } },
-        }),
-        this.prisma.account.findMany({
-          where: { isActive: true },
-          select: { label: true, currentBalance: true },
-        }),
-      ]);
+    const [
+      totalStudents,
+      todayPayments,
+      outstandingFinance,
+      accounts,
+      cashMethods,
+      undepositedPayments,
+      undepositedIncome,
+      undepositedExpense,
+      trendPayments,
+    ] = await this.prisma.$transaction([
+      this.prisma.student.count({
+        where: { isDeleted: false, status: "active" },
+      }),
+      this.prisma.payment.findMany({
+        where: { date: { gte: today, lte: todayEnd } },
+      }),
+      this.prisma.studentFinance.findMany({
+        where: { isSnapshot: false, remaining: { gt: 0 } },
+      }),
+      this.prisma.account.findMany({
+        where: { isActive: true },
+        select: {
+          label: true,
+          currentBalance: true,
+          paymentMethod: { select: { type: true } },
+        },
+      }),
+      this.prisma.paymentMethod.findMany({
+        where: { type: "cash" },
+      }),
+      // Undeposited Cash Payments (Student Fees)
+      this.prisma.payment.aggregate({
+        where: { method: { type: "cash" }, accountId: null },
+        _sum: { amount: true },
+      }),
+      // Undeposited Cash Income (Other)
+      this.prisma.otherTransaction.aggregate({
+        where: { type: "income", accountId: null },
+        _sum: { amount: true },
+      }),
+      // Undeposited Cash Expense (Other)
+      this.prisma.otherTransaction.aggregate({
+        where: { type: "expense", accountId: null },
+        _sum: { amount: true },
+      }),
+      // Trend Payments (last 7 days)
+      this.prisma.payment.findMany({
+        where: { date: { gte: last7Days } },
+        select: { date: true, amount: true },
+      }),
+    ]);
 
     const todayTotal = todayPayments.reduce(
       (s, p) => s.plus(new Decimal(p.amount.toString())),
@@ -345,11 +384,71 @@ export class ReportsService {
       new Decimal(0),
     );
 
+    // Calculate Cash vs Bank vs Online
+    let cashBalance = new Decimal(0);
+    let bankBalance = new Decimal(0);
+    let onlineBalance = new Decimal(0);
+
+    accounts.forEach((acc) => {
+      const bal = new Decimal(acc.currentBalance.toString());
+      if (acc.paymentMethod.type === "cash") {
+        cashBalance = cashBalance.plus(bal);
+      } else if (acc.paymentMethod.type === "bank") {
+        bankBalance = bankBalance.plus(bal);
+      } else if (acc.paymentMethod.type === "online") {
+        onlineBalance = onlineBalance.plus(bal);
+      }
+    });
+
+    // Add Undeposited Cash
+    const unDepPayments = new Decimal(
+      undepositedPayments._sum.amount?.toString() || "0",
+    );
+    const unDepIncome = new Decimal(
+      undepositedIncome._sum.amount?.toString() || "0",
+    );
+    const unDepExpense = new Decimal(
+      undepositedExpense._sum.amount?.toString() || "0",
+    );
+
+    cashBalance = cashBalance
+      .plus(unDepPayments)
+      .plus(unDepIncome)
+      .minus(unDepExpense);
+
+    // Calculate Trend
+    const trendMap = new Map<string, Decimal>();
+    for (let i = 0; i < 7; i++) {
+      const d = dayjs().subtract(i, "days").format("MMM DD");
+      trendMap.set(d, new Decimal(0));
+    }
+
+    trendPayments.forEach((p) => {
+      const d = dayjs(p.date).format("MMM DD");
+      if (trendMap.has(d)) {
+        trendMap.set(
+          d,
+          trendMap.get(d)!.plus(new Decimal(p.amount.toString())),
+        );
+      }
+    });
+
+    const revenueTrend = Array.from(trendMap.entries())
+      .map(([name, amount]) => ({
+        name,
+        amount: parseFloat(amount.toFixed(2)),
+      }))
+      .reverse();
+
     return {
       totalActiveStudents: totalStudents,
       todayReceived: todayTotal.toFixed(2),
       todayPaymentCount: todayPayments.length,
       totalOutstanding: totalOutstanding.toFixed(2),
+      cashBalance: cashBalance.toFixed(2),
+      bankBalance: bankBalance.toFixed(2),
+      onlineBalance: onlineBalance.toFixed(2),
+      revenueTrend,
       accounts: accounts.map((a) => ({
         label: a.label,
         balance: a.currentBalance.toString(),

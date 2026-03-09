@@ -226,15 +226,17 @@ model AuditLog {
 // Generic income/expense tracking unrelated to student fees.
 // ─────────────────────────────────────────────────────────────────────────────
 model OtherTransaction {
-  id        Int      @id @default(autoincrement())
-  type      String   // 'income' | 'expense'
-  category  String   // e.g. "Utility Bills", "Donation", "Salary"
-  amount    Decimal  @db.Decimal(12, 2)
-  date      DateTime @default(now())
-  account   Account? @relation(fields: [accountId], references: [id])
-  accountId Int?
-  notes     String?
-  createdAt DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  type         String   // 'income' | 'expense'
+  category     String   // e.g. "Utility Bills", "Donation", "Salary"
+  amount       Decimal  @db.Decimal(12, 2)
+  date         DateTime @default(now())
+  account      Account? @relation(fields: [accountId], references: [id])
+  accountId    Int?
+  notes        String?
+  senderName   String?  // For income transactions
+  receiverName String?  // For expense transactions
+  createdAt    DateTime @default(now())
 
   @@map("other_transactions")
 }

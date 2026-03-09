@@ -1,21 +1,25 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { departmentsApi } from "@/lib/api/client";
+import { departmentsApi, sessionsApi } from "@/lib/api/client";
 import Modal from "@/components/ui/Modal";
 import {
   Plus,
-  Search,
   Building2,
   Trash2,
+  ChevronDown,
   ChevronRight,
   BookOpen,
   Users,
   GraduationCap,
   Settings,
+  Calendar,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 import { clsx } from "clsx";
 
+// ─────────────────────────────── Department Modal ──────────────────────────
 function DepartmentModal({
   onClose,
   editData = null,
@@ -30,11 +34,12 @@ function DepartmentModal({
     name: editData?.name || "",
     code: editData?.code || "",
     description: editData?.description || "",
-    programMode: editData?.offersSem ? "semester" : "annual",
-    yearsDuration: editData?.yearsDuration?.toString() || "5",
-    totalSemesters: editData?.semsPerYear && editData?.yearsDuration 
-      ? (editData.semsPerYear * editData.yearsDuration).toString()
-      : "10",
+    programMode: editData?.offersSem ? "semester" : editData?.offersAnn ? "annual" : "semester",
+    yearsDuration: editData?.yearsDuration?.toString() || "4",
+    totalSemesters:
+      editData?.semsPerYear && editData?.yearsDuration
+        ? (editData.semsPerYear * editData.yearsDuration).toString()
+        : "8",
     semsPerYear: editData?.semsPerYear?.toString() || "2",
     semFee:
       editData?.feeStructures?.find((f: any) => f.programMode === "semester")
@@ -44,7 +49,6 @@ function DepartmentModal({
         ?.feeAmount || "",
   });
 
-  // Calculate duration if semesters change
   useEffect(() => {
     if (
       form.programMode === "semester" &&
@@ -52,9 +56,8 @@ function DepartmentModal({
       form.semsPerYear
     ) {
       const years = Number(form.totalSemesters) / Number(form.semsPerYear);
-      if (!isNaN(years) && years > 0) {
+      if (!isNaN(years) && years > 0)
         setForm((f) => ({ ...f, yearsDuration: years.toString() }));
-      }
     }
   }, [form.totalSemesters, form.semsPerYear, form.programMode]);
 
@@ -96,11 +99,10 @@ function DepartmentModal({
               onClick={() => {
                 if (
                   window.confirm(
-                    "Delete this department? This requires all its sessions to be deleted first.",
+                    "Delete this department? All sessions must be deleted first.",
                   )
-                ) {
+                )
                   deleteMutation.mutate();
-                }
               }}
               disabled={deleteMutation.isPending}
               className="p-4 rounded-xl border-2 border-red-100 text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center group"
@@ -131,20 +133,10 @@ function DepartmentModal({
                     : null,
                 feeStructures: [
                   ...(form.programMode === "semester" && form.semFee
-                    ? [
-                        {
-                          programMode: "semester",
-                          feeAmount: form.semFee,
-                        },
-                      ]
+                    ? [{ programMode: "semester", feeAmount: form.semFee }]
                     : []),
                   ...(form.programMode === "annual" && form.annFee
-                    ? [
-                        {
-                          programMode: "annual",
-                          feeAmount: form.annFee,
-                        },
-                      ]
+                    ? [{ programMode: "annual", feeAmount: form.annFee }]
                     : []),
                 ],
               })
@@ -162,7 +154,6 @@ function DepartmentModal({
       }
     >
       <div className="space-y-6">
-        {/* Program Mode Slider */}
         <div>
           <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-3 text-center">
             Program Structure
@@ -217,7 +208,7 @@ function DepartmentModal({
           </div>
           <div className="col-span-2 md:col-span-1">
             <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2">
-              Dpt. Code
+              Dept. Code
             </label>
             <input
               className="input-field !text-slate-900 font-bold"
@@ -234,7 +225,7 @@ function DepartmentModal({
           </label>
           <textarea
             className="input-field !text-slate-900 font-bold resize-none"
-            placeholder="Brief description of the department (optional)"
+            placeholder="Brief description (optional)"
             rows={2}
             value={form.description}
             onChange={(e) => set("description", e.target.value)}
@@ -242,7 +233,7 @@ function DepartmentModal({
         </div>
 
         {form.programMode === "semester" ? (
-          <div className="grid grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2">
                 Total Sems *
@@ -267,15 +258,18 @@ function DepartmentModal({
             </div>
             <div>
               <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2">
-                Years (Auto)
+                Years
               </label>
-              <div className="input-field bg-slate-50 !text-slate-900 font-black flex items-center">
-                {form.yearsDuration}
-              </div>
+              <input
+                type="number"
+                className="input-field !text-slate-900 font-bold"
+                value={form.yearsDuration}
+                onChange={(e) => set("yearsDuration", e.target.value)}
+              />
             </div>
           </div>
         ) : (
-          <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+          <div>
             <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2">
               Duration in Years *
             </label>
@@ -311,12 +305,12 @@ function DepartmentModal({
         </div>
 
         {mutation.error && (
-          <p className="text-red-500 text-xs font-bold mt-2 pb-2">
+          <p className="text-red-500 text-xs font-bold pb-2">
             {String(mutation.error)}
           </p>
         )}
         {deleteMutation.error && (
-          <p className="text-red-500 text-xs font-bold mt-2 pb-2">
+          <p className="text-red-500 text-xs font-bold pb-2">
             {String(deleteMutation.error)}
           </p>
         )}
@@ -325,19 +319,430 @@ function DepartmentModal({
   );
 }
 
+// ─────────────────────────────────── Session Modal ─────────────────────────
+function SessionModal({
+  onClose,
+  editData = null,
+  preselectedDept = null,
+}: {
+  onClose: () => void;
+  editData?: any;
+  preselectedDept?: any;
+}) {
+  const qc = useQueryClient();
+  const isEdit = !!editData;
+
+  const [form, setForm] = useState({
+    startYear:
+      editData?.startYear?.toString() || new Date().getFullYear().toString(),
+    endYear: editData?.endYear?.toString() || "",
+    label: editData?.label || "",
+  });
+
+  useEffect(() => {
+    if (preselectedDept && form.startYear && !isEdit) {
+      const duration = Number(preselectedDept.yearsDuration) || 5;
+      const end = Number(form.startYear) + duration;
+      setForm((f) => ({
+        ...f,
+        endYear: end.toString(),
+        label: `${f.startYear}–${end}`,
+      }));
+    }
+  }, [preselectedDept, form.startYear, isEdit]);
+
+  const mutation = useMutation({
+    mutationFn: isEdit
+      ? (dto: any) => sessionsApi.update(editData.id, dto)
+      : (dto: any) => sessionsApi.create(dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+      qc.invalidateQueries({ queryKey: ["departments"] });
+      onClose();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => sessionsApi.delete(editData.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+      qc.invalidateQueries({ queryKey: ["departments"] });
+      onClose();
+    },
+  });
+
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  return (
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={isEdit ? "Edit Session" : "Add Session"}
+      subtitle={
+        isEdit
+          ? `Managing ${editData.label}`
+          : `New session for ${preselectedDept?.name}`
+      }
+      icon={Calendar}
+      iconColor="text-brand-gold"
+      footer={
+        <div className="flex gap-3 w-full">
+          {isEdit && (
+            <button
+              onClick={() => {
+                if (window.confirm("Delete this session?"))
+                  deleteMutation.mutate();
+              }}
+              disabled={deleteMutation.isPending}
+              className="p-4 rounded-xl border-2 border-red-100 text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center group"
+            >
+              <Trash2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            </button>
+          )}
+          <button onClick={onClose} className="btn-secondary px-6">
+            Cancel
+          </button>
+          <button
+            className="btn-primary flex-1"
+            disabled={
+              !form.startYear ||
+              !form.endYear ||
+              mutation.isPending ||
+              deleteMutation.isPending
+            }
+            onClick={() =>
+              mutation.mutate({
+                departmentId: Number(
+                  preselectedDept?.id || editData?.departmentId,
+                ),
+                startYear: Number(form.startYear),
+                endYear: Number(form.endYear),
+                label: form.label,
+              })
+            }
+          >
+            {mutation.isPending
+              ? isEdit
+                ? "Saving..."
+                : "Creating..."
+              : isEdit
+                ? "Save Changes"
+                : "Create Session"}
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-3 border border-slate-100">
+          <Building2 className="w-4 h-4 text-brand-blue flex-shrink-0" />
+          <span className="text-sm font-black text-slate-700">
+            {preselectedDept?.name || editData?.department?.name}
+          </span>
+          <span className="ml-auto text-[10px] font-black text-slate-400 uppercase tracking-wider">
+            {preselectedDept?.yearsDuration ||
+              editData?.department?.yearsDuration}
+            y program
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2">
+              Start Year *
+            </label>
+            <input
+              type="number"
+              className="input-field !text-slate-900 font-bold"
+              value={form.startYear}
+              onChange={(e) => set("startYear", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2">
+              End Year *
+            </label>
+            <input
+              type="number"
+              className="input-field !text-slate-900 font-bold"
+              value={form.endYear}
+              onChange={(e) => set("endYear", e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2">
+            Session Label
+          </label>
+          <input
+            className="input-field !text-slate-900 font-bold"
+            placeholder="e.g. 2024–2029"
+            value={form.label}
+            onChange={(e) => set("label", e.target.value)}
+          />
+        </div>
+
+        {mutation.error && (
+          <p className="text-red-500 text-xs font-bold pb-2">
+            {String(mutation.error)}
+          </p>
+        )}
+        {deleteMutation.error && (
+          <p className="text-red-500 text-xs font-bold pb-2">
+            {String(deleteMutation.error)}
+          </p>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────── Department Card ───────────────────────────
+function DepartmentCard({
+  dept,
+  sessions,
+  onManageDept,
+  onAddSession,
+  onManageSession,
+}: {
+  dept: any;
+  sessions: any[];
+  onManageDept: () => void;
+  onAddSession: () => void;
+  onManageSession: (s: any) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const currentYear = new Date().getFullYear();
+
+  const totalStudents = dept._count?.students ?? 0;
+  const totalSessions = sessions.length;
+  const activeSessions = sessions.filter(
+    (s) => currentYear >= s.startYear && currentYear <= s.endYear,
+  ).length;
+
+  return (
+    <div className="card-premium overflow-hidden transition-all duration-300">
+      {/* Dept Header */}
+      <div className="p-6">
+        <div className="flex justify-between items-start mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-brand-blue/5 rounded-2xl flex items-center justify-center text-brand-blue">
+              <Building2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-800">{dept.name}</h3>
+              {dept.code && (
+                <span className="text-[9px] font-black text-brand-blue bg-blue-50 px-2 py-0.5 rounded uppercase">
+                  {dept.code}
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onManageDept}
+            className="p-2 text-slate-400 hover:text-brand-blue hover:bg-blue-50 rounded-xl transition-all"
+            title="Manage Department"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
+
+        {dept.description && (
+          <p className="text-sm font-medium text-slate-500 mb-4">
+            {dept.description}
+          </p>
+        )}
+
+        {/* Tags */}
+        <div className="flex flex-wrap gap-2 mb-5">
+          {dept.offersSem && (
+            <div className="px-2.5 py-1 bg-blue-50 rounded-lg text-[10px] font-bold text-blue-600 uppercase">
+              {dept.semsPerYear * dept.yearsDuration} Semesters
+            </div>
+          )}
+          {dept.offersAnn && (
+            <div className="px-2.5 py-1 bg-orange-50 rounded-lg text-[10px] font-bold text-orange-600 uppercase">
+              Annual
+            </div>
+          )}
+          <div className="px-2.5 py-1 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-600 uppercase">
+            {dept.yearsDuration}y Duration
+          </div>
+        </div>
+
+        {/* Stats Row */}
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+          <div className="flex gap-4">
+            <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <Users className="w-3.5 h-3.5" /> {totalStudents} Students
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <Calendar className="w-3.5 h-3.5" /> {totalSessions} Sessions
+            </div>
+            {activeSessions > 0 && (
+              <div className="flex items-center gap-1 text-[10px] font-black text-green-600 uppercase tracking-widest">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />{" "}
+                {activeSessions} Active
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="flex items-center gap-1 text-[10px] font-black text-brand-blue uppercase tracking-wider hover:text-brand-gold transition-colors"
+          >
+            Sessions{" "}
+            {expanded ? (
+              <ChevronDown className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Sessions Panel */}
+      {expanded && (
+        <div className="border-t border-slate-100 bg-slate-50/50 p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Sessions for {dept.name}
+            </p>
+            <button
+              onClick={onAddSession}
+              className="flex items-center gap-1 text-[10px] font-black text-brand-blue uppercase tracking-wider hover:text-brand-gold transition-colors px-3 py-1.5 bg-white rounded-lg border border-slate-200 hover:border-brand-gold"
+            >
+              <Plus className="w-3 h-3" /> Add Session
+            </button>
+          </div>
+
+          {sessions.length === 0 ? (
+            <div className="text-center py-8 text-slate-400">
+              <Calendar className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="text-xs font-bold uppercase tracking-widest">
+                No sessions yet
+              </p>
+              <button
+                onClick={onAddSession}
+                className="mt-3 text-xs font-black text-brand-blue hover:text-brand-gold uppercase tracking-wider"
+              >
+                Create First Session →
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {sessions.map((session) => {
+                const isPassedOut = currentYear > session.endYear;
+                const isRunning =
+                  currentYear >= session.startYear &&
+                  currentYear <= session.endYear;
+
+                // Get unique active semesters/years
+                const activeLevels = new Set<number>();
+                if (session.students) {
+                  session.students.forEach((s: any) => {
+                    if (s.currentSemester) {
+                      if (dept.offersSem) {
+                        activeLevels.add(s.currentSemester);
+                      } else {
+                        const year = Math.ceil(s.currentSemester / (dept.semsPerYear || 1));
+                        activeLevels.add(year);
+                      }
+                    }
+                  });
+                }
+                const sortedLevels = Array.from(activeLevels).sort((a, b) => a - b);
+
+                return (
+                  <div
+                    key={session.id}
+                    className={clsx(
+                      "bg-white rounded-2xl p-4 border transition-all",
+                      isRunning
+                        ? "border-green-200"
+                        : isPassedOut
+                          ? "border-slate-100"
+                          : "border-blue-100",
+                    )}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-black text-slate-800 text-sm">
+                          {session.label}
+                        </p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          {session.startYear} — {session.endYear}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isPassedOut ? (
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[9px] font-black uppercase flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Passed Out
+                          </span>
+                        ) : isRunning ? (
+                          <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-md text-[9px] font-black uppercase flex items-center gap-1">
+                            <Clock className="w-3 h-3 animate-pulse" /> Running
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-blue-50 text-brand-blue rounded-md text-[9px] font-black uppercase">
+                            Upcoming
+                          </span>
+                        )}
+                        <button
+                          onClick={() => onManageSession(session)}
+                          className="p-1.5 text-slate-400 hover:text-brand-gold hover:bg-brand-gold/10 rounded-lg transition-all"
+                        >
+                          <Settings className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Student Count + Active Levels */}
+                    <div className="flex items-center justify-between border-t border-slate-50 pt-3 mt-3">
+                      <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase">
+                        <Users className="w-3 h-3" />{" "}
+                        {session._count?.students || 0} Enrolled
+                      </div>
+                      {sortedLevels.length > 0 && (
+                        <div className="text-[10px] font-black text-brand-blue uppercase">
+                          {dept.offersSem ? "Sems" : "Years"}: {sortedLevels.join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────── Main Page ──────────────────────────────────
 export default function DepartmentsPage() {
-  const [modalState, setModalState] = useState<{
+  const [deptModal, setDeptModal] = useState<{
     isOpen: boolean;
     data: any | null;
-  }>({
-    isOpen: false,
-    data: null,
-  });
+  }>({ isOpen: false, data: null });
+  const [sessionModal, setSessionModal] = useState<{
+    isOpen: boolean;
+    data: any | null;
+    dept: any | null;
+  }>({ isOpen: false, data: null, dept: null });
 
   const { data: departments, isLoading } = useQuery({
     queryKey: ["departments"],
     queryFn: departmentsApi.list,
   });
+
+  const { data: allSessions } = useQuery({
+    queryKey: ["sessions"],
+    queryFn: () => sessionsApi.list(),
+  });
+
+  const getSessionsForDept = (deptId: number) =>
+    (allSessions || []).filter((s: any) => s.departmentId === deptId);
 
   if (isLoading) {
     return (
@@ -357,24 +762,35 @@ export default function DepartmentsPage() {
 
   return (
     <div className="space-y-8 animate-fade-in p-2 max-w-[1600px] mx-auto">
-      {modalState.isOpen && (
+      {deptModal.isOpen && (
         <DepartmentModal
-          editData={modalState.data}
-          onClose={() => setModalState({ isOpen: false, data: null })}
+          editData={deptModal.data}
+          onClose={() => setDeptModal({ isOpen: false, data: null })}
+        />
+      )}
+      {sessionModal.isOpen && (
+        <SessionModal
+          editData={sessionModal.data}
+          preselectedDept={sessionModal.dept}
+          onClose={() =>
+            setSessionModal({ isOpen: false, data: null, dept: null })
+          }
         />
       )}
 
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">
             Academic Departments
           </h2>
           <p className="text-slate-500 font-medium mt-1">
-            Manage institutional divisions and fee structures.
+            Manage institutional divisions, fee structures, and academic
+            sessions.
           </p>
         </div>
         <button
-          onClick={() => setModalState({ isOpen: true, data: null })}
+          onClick={() => setDeptModal({ isOpen: true, data: null })}
           className="btn-primary flex items-center gap-2 group"
         >
           <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />{" "}
@@ -382,23 +798,30 @@ export default function DepartmentsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
           {
-            label: "Total Departments",
+            label: "Departments",
             value: departments?.length ?? 0,
             icon: Building2,
             color: "text-brand-blue",
           },
           {
-            label: "Total Students",
+            label: "Sessions",
+            value: allSessions?.length ?? 0,
+            icon: Calendar,
+            color: "text-brand-gold",
+          },
+          {
+            label: "Students",
             value:
               departments?.reduce(
                 (s: number, d: any) => s + (d._count?.students ?? 0),
                 0,
               ) ?? 0,
             icon: Users,
-            color: "text-brand-gold",
+            color: "text-green-600",
           },
           {
             label: "Programs",
@@ -408,10 +831,10 @@ export default function DepartmentsPage() {
                 0,
               ) ?? 0,
             icon: GraduationCap,
-            color: "text-green-600",
+            color: "text-purple-600",
           },
         ].map((stat, i) => (
-          <div key={i} className="card-premium p-6 flex items-center gap-4">
+          <div key={i} className="card-premium p-5 flex items-center gap-4">
             <div className={clsx("p-3 rounded-2xl bg-slate-50", stat.color)}>
               <stat.icon className="w-6 h-6" />
             </div>
@@ -425,6 +848,7 @@ export default function DepartmentsPage() {
         ))}
       </div>
 
+      {/* Department Cards */}
       {departments && departments.length === 0 ? (
         <div className="card-premium p-16 flex flex-col items-center justify-center text-center">
           <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mb-6">
@@ -437,69 +861,37 @@ export default function DepartmentsPage() {
             Create your first academic department to get started.
           </p>
           <button
-            onClick={() => setModalState({ isOpen: true, data: null })}
+            onClick={() => setDeptModal({ isOpen: true, data: null })}
             className="btn-primary mt-8"
           >
             Create First Department
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {departments?.map((dept: any) => (
-            <div
+            <DepartmentCard
               key={dept.id}
-              className="card-premium p-6 group hover:border-brand-blue/20 transition-all duration-300 flex flex-col h-full"
-            >
-              <div className="flex justify-between items-start mb-6">
-                <div className="w-14 h-14 bg-brand-blue/5 rounded-2xl flex items-center justify-center text-brand-blue group-hover:bg-brand-blue group-hover:text-white transition-all duration-500">
-                  <Building2 className="w-7 h-7" />
-                </div>
-                {dept.code && (
-                  <div className="px-2.5 py-1 bg-blue-50 text-brand-blue rounded-lg text-[9px] font-black uppercase">
-                    {dept.code}
-                  </div>
-                )}
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-black text-slate-800 group-hover:text-brand-blue transition-colors">
-                  {dept.name}
-                </h3>
-                <p className="text-sm font-medium text-slate-500 mt-1">
-                  {dept.description || "No description provided."}
-                </p>
-                <div className="mt-6 flex flex-wrap gap-2">
-                  {dept.offersSem && (
-                    <div className="px-3 py-1 bg-blue-50 rounded-lg text-[10px] font-bold text-blue-600 uppercase">
-                      {dept.semsPerYear * dept.yearsDuration} Semesters
-                    </div>
-                  )}
-                  {dept.offersAnn && (
-                    <div className="px-3 py-1 bg-orange-50 rounded-lg text-[10px] font-bold text-orange-600 uppercase">
-                      Annual
-                    </div>
-                  )}
-                  <div className="px-3 py-1 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-600 uppercase">
-                    {dept.yearsDuration}y Duration
-                  </div>
-                </div>
-              </div>
-              <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  {dept._count?.students ?? 0} Students
-                </div>
-                <button
-                  onClick={() => setModalState({ isOpen: true, data: dept })}
-                  className="flex items-center gap-1 text-xs font-black text-brand-blue uppercase tracking-wider group/link hover:text-brand-gold transition-colors"
-                >
-                  Manage{" "}
-                  <ChevronRight className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
-                </button>
-              </div>
-            </div>
+              dept={dept}
+              sessions={getSessionsForDept(dept.id)}
+              onManageDept={() => setDeptModal({ isOpen: true, data: dept })}
+              onAddSession={() =>
+                setSessionModal({ isOpen: true, data: null, dept })
+              }
+              onManageSession={(s) =>
+                setSessionModal({
+                  isOpen: true,
+                  data: s,
+                  dept:
+                    departments.find((d: any) => d.id === s.departmentId) ||
+                    dept,
+                })
+              }
+            />
           ))}
           <button
-            onClick={() => setModalState({ isOpen: true, data: null })}
-            className="border-2 border-dashed border-slate-200 rounded-3xl p-6 flex flex-col items-center justify-center gap-4 hover:border-brand-gold hover:bg-brand-gold/5 transition-all group min-h-[300px]"
+            onClick={() => setDeptModal({ isOpen: true, data: null })}
+            className="border-2 border-dashed border-slate-200 rounded-3xl p-6 flex flex-col items-center justify-center gap-4 hover:border-brand-gold hover:bg-brand-gold/5 transition-all group min-h-[200px]"
           >
             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 group-hover:bg-brand-gold group-hover:text-white transition-all">
               <Plus className="w-8 h-8" />

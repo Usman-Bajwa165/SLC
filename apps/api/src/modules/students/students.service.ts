@@ -77,11 +77,17 @@ export class StudentsService {
         skip,
         take,
         include: {
-          department: { select: { id: true, name: true, code: true } },
+          department: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
           session: { select: { id: true, label: true } },
           financeRecords: {
             where: { isSnapshot: false },
-            select: { remaining: true },
+            select: { feePaid: true, feeDue: true, remaining: true },
           },
         },
         orderBy: { createdAt: "desc" },
@@ -207,6 +213,7 @@ export class StudentsService {
       accountId,
       receiptNo,
       senderName,
+      receiverName,
       paymentDate,
       ...studentData
     } = dto;
@@ -243,7 +250,11 @@ export class StudentsService {
             methodId: paymentMethodId,
             accountId: accountId || null,
             receiptNo,
-            notes: senderName ? `Sender: ${senderName}` : "Enrollment Advance",
+            notes: senderName
+              ? `Sender: ${senderName}`
+              : receiverName
+                ? `Receiver: ${receiverName}`
+                : "Enrollment Advance",
           },
         });
 
@@ -290,6 +301,7 @@ export class StudentsService {
       accountId,
       receiptNo,
       senderName,
+      receiverName,
       paymentDate,
       ...updateData
     } = dto;
@@ -301,6 +313,28 @@ export class StudentsService {
         where: { id },
         data: { ...updateData, version: { increment: 1 } },
       });
+
+      // Find the active student finance
+      const activeFinance = await tx.studentFinance.findFirst({
+        where: { studentId: id, isSnapshot: false },
+        orderBy: { createdAt: "desc" },
+      });
+
+      // Update fee if initialFeeAmount is provided
+      if (initialFeeAmount && activeFinance) {
+        const newFeeDue = new Decimal(initialFeeAmount);
+        const currentPaid = new Decimal(activeFinance.feePaid.toString());
+        const currentCarryOver = new Decimal(activeFinance.carryOver.toString());
+        const newRemaining = newFeeDue.plus(currentCarryOver).minus(currentPaid);
+
+        await tx.studentFinance.update({
+          where: { id: activeFinance.id },
+          data: {
+            feeDue: newFeeDue,
+            remaining: newRemaining,
+          },
+        });
+      }
 
       // If there is an advance payment provided during update,
       // log it against the student's active StudentFinance record.
@@ -316,11 +350,11 @@ export class StudentsService {
           );
         }
 
-        // Find the active student finance
-        const activeFinance = await tx.studentFinance.findFirst({
-          where: { studentId: id, isSnapshot: false },
-          orderBy: { createdAt: "desc" },
-        });
+        if (!activeFinance) {
+          throw new BadRequestException(
+            "No active finance record found for this student",
+          );
+        }
 
         const payment = await tx.payment.create({
           data: {
@@ -332,29 +366,29 @@ export class StudentsService {
             receiptNo,
             notes: senderName
               ? `Sender: ${senderName}`
-              : "Payment from Profile Update",
+              : receiverName
+                ? `Receiver: ${receiverName}`
+                : "Payment from Profile Update",
           },
         });
 
-        if (activeFinance) {
-          // Update the finance record by applying the payment
-          await tx.studentFinance.update({
-            where: { id: activeFinance.id },
-            data: {
-              feePaid: { increment: advancePaid },
-              advanceTaken: { increment: advancePaid },
-              remaining: { decrement: advancePaid },
-            },
-          });
+        // Update the finance record by applying the payment
+        await tx.studentFinance.update({
+          where: { id: activeFinance.id },
+          data: {
+            feePaid: { increment: advancePaid },
+            advanceTaken: { increment: advancePaid },
+            remaining: { decrement: advancePaid },
+          },
+        });
 
-          await tx.paymentAllocation.create({
-            data: {
-              paymentId: payment.id,
-              studentFinanceId: activeFinance.id,
-              allocatedAmount: advancePaid,
-            },
-          });
-        }
+        await tx.paymentAllocation.create({
+          data: {
+            paymentId: payment.id,
+            studentFinanceId: activeFinance.id,
+            allocatedAmount: advancePaid,
+          },
+        });
 
         // Update target account balance
         if (accountId) {
@@ -395,15 +429,56 @@ export class StudentsService {
     const currentTerm = student.currentSemester || 0;
     const nextTerm = currentTerm + 1;
 
+    // Check if student is at last term - should graduate instead
     if (nextTerm > totalTerms) {
-      throw new BadRequestException(
-        `Cannot promote: student is already at term ${currentTerm} of ${totalTerms}. Consider marking as Graduated.`,
+      // Check for outstanding dues
+      const activeFinance = await this.prisma.studentFinance.findMany({
+        where: { studentId: id, isSnapshot: false },
+      });
+
+      const totalRemaining = activeFinance.reduce(
+        (sum, f) => sum.plus(new Decimal(f.remaining.toString())),
+        new Decimal(0),
       );
+
+      if (totalRemaining.greaterThan(0)) {
+        throw new BadRequestException(
+          `Cannot graduate: student has outstanding dues of PKR ${totalRemaining.toString()}. Please clear all dues before graduation.`,
+        );
+      }
+
+      // Mark as graduated
+      const result = await this.prisma.$transaction(async (tx) => {
+        await tx.studentFinance.updateMany({
+          where: { studentId: id, isSnapshot: false },
+          data: { isSnapshot: true },
+        });
+
+        const updatedStudent = await tx.student.update({
+          where: { id },
+          data: {
+            status: "graduated",
+            version: { increment: 1 },
+          },
+        });
+
+        return updatedStudent;
+      });
+
+      await this.audit.log(
+        "student",
+        id,
+        "graduate",
+        { status: student.status },
+        { status: "graduated" },
+      );
+      return result;
     }
 
     // Compute carryover from all non-snapshot finance records
     const activeFinance = await this.prisma.studentFinance.findMany({
       where: { studentId: id, isSnapshot: false },
+      orderBy: { createdAt: 'desc' },
     });
 
     const totalRemaining = activeFinance.reduce(
@@ -411,14 +486,23 @@ export class StudentsService {
       new Decimal(0),
     );
 
-    // Get new fee from fee structure
-    const feeStructure = await this.departments.getActiveFeeStructure(
-      student.departmentId,
-      student.programMode,
-    );
-    const baseFee = feeStructure
-      ? new Decimal(feeStructure.feeAmount.toString())
+    // Use previous term's fee as base fee for new term
+    const previousTermFee = activeFinance.length > 0 
+      ? new Decimal(activeFinance[0].feeDue.toString())
       : new Decimal(0);
+    
+    // If no previous fee, get from fee structure
+    let baseFee = previousTermFee;
+    if (baseFee.isZero()) {
+      const feeStructure = await this.departments.getActiveFeeStructure(
+        student.departmentId,
+        student.programMode,
+      );
+      baseFee = feeStructure
+        ? new Decimal(feeStructure.feeAmount.toString())
+        : new Decimal(0);
+    }
+    
     const newFeeDue = baseFee;
     const totalRemainingForTerm = baseFee.plus(totalRemaining);
     const termLabel = this.buildTermLabel(student.programMode, nextTerm);

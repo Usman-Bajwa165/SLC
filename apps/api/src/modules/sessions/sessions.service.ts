@@ -19,6 +19,10 @@ export class SessionsService {
       include: {
         department: true,
         _count: { select: { students: true } },
+        students: {
+          where: { isDeleted: false },
+          select: { id: true, currentSemester: true },
+        },
       },
       orderBy: { startYear: "desc" },
     });

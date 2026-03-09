@@ -19,6 +19,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { showBar, hideBar } from "@/lib/progress";
+import { formatContact, formatCNIC } from "@/lib/utils";
 
 export default function EnrollmentPage() {
   const queryClient = useQueryClient();
@@ -46,7 +48,9 @@ export default function EnrollmentPage() {
     accountId: "",
     receiptNo: "",
     senderName: "",
+    receiverName: "",
     paymentDate: new Date().toISOString().split("T")[0],
+    totalOutstanding: "",
   };
 
   const searchParams = useSearchParams();
@@ -65,6 +69,7 @@ export default function EnrollmentPage() {
   const [selectedExistingId, setSelectedExistingId] = useState<number | null>(
     null,
   );
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
   const [form, setForm] = useState({ ...defaultForm });
   const fullNameRef = useRef<HTMLInputElement>(null);
@@ -99,6 +104,19 @@ export default function EnrollmentPage() {
     enabled: mode === "existing",
   });
 
+  const studentIdParam = searchParams.get("studentId");
+  const { data: directStudent } = useQuery({
+    queryKey: ["student-direct", studentIdParam],
+    queryFn: () => studentsApi.get(Number(studentIdParam!)),
+    enabled: !!studentIdParam && !selectedExistingId,
+  });
+
+  useEffect(() => {
+    if (directStudent && !selectedExistingId) {
+      selectExistingStudent(directStudent);
+    }
+  }, [directStudent]);
+
   // Calculate / Reset logic
   const selectedDept = depts?.find(
     (d: any) => d.id === Number(form.departmentId),
@@ -129,6 +147,18 @@ export default function EnrollmentPage() {
   const selectExistingStudent = (student: any) => {
     setSelectedExistingId(student.id);
     setSearchQuery(`${student.name} - ${student.rollNo || "No Roll"}`);
+
+    const currentFinance = student.financeRecords?.find(
+      (f: any) => !f.isSnapshot,
+    );
+    const totalOutstanding =
+      student.financeRecords
+        ?.filter((f: any) => !f.isSnapshot)
+        .reduce((s: number, f: any) => s + parseFloat(f.remaining), 0) ?? 0;
+
+    const hasGpa = student.cgpa || student.sgpa;
+    const hasMarks = student.obtainedMarks || student.totalMarks;
+
     setForm({
       ...form,
       name: student.name,
@@ -141,30 +171,63 @@ export default function EnrollmentPage() {
       sessionId: student.sessionId?.toString() || "",
       programMode: student.programMode,
       currentSemester: student.currentSemester?.toString() || "",
+      enrolledAt: student.enrolledAt ? student.enrolledAt.split("T")[0] : "",
       obtainedMarks: student.obtainedMarks?.toString() || "",
       totalMarks: student.totalMarks?.toString() || "",
       sgpa: student.sgpa?.toString() || "",
       cgpa: student.cgpa?.toString() || "",
-      marksType: student.cgpa ? "cgpa" : "marks",
+      marksType: hasGpa && hasMarks ? "both" : hasGpa ? "cgpa" : "marks",
+      initialFeeAmount: currentFinance?.feeDue?.toString() || "",
+      advancePaid: "",
+      totalOutstanding: totalOutstanding.toString(),
     });
+    toast.info(
+      `Selected ${student.name}. Current Arrears: PKR ${totalOutstanding.toLocaleString()}`,
+    );
   };
 
   const advanceVal = Number(form.advancePaid) || 0;
   const initialFeeVal = Number(form.initialFeeAmount) || 0;
-  const remainingCalculated = Math.max(0, initialFeeVal - advanceVal);
+  const totalOutstandingVal = Number(form.totalOutstanding) || 0;
+  const remainingCalculated = mode === "existing" && totalOutstandingVal > 0
+    ? Math.max(0, totalOutstandingVal - advanceVal)
+    : Math.max(0, initialFeeVal - advanceVal);
 
   const modeButtonRef = useRef<HTMLButtonElement>(null);
 
   const mutation = useMutation({
     mutationFn: (data: any) => {
+      // Validate marks/GPA based on marksType
+      if (data.marksType === "marks") {
+        if (!data.obtainedMarks || !data.totalMarks) {
+          throw new Error("Both Obtained Marks and Total Marks are required when Marks is selected");
+        }
+      } else if (data.marksType === "cgpa") {
+        if (!data.sgpa || !data.cgpa) {
+          throw new Error("Both SGPA and CGPA are required when CGPA is selected");
+        }
+      } else if (data.marksType === "both") {
+        if (!data.obtainedMarks || !data.totalMarks || !data.sgpa || !data.cgpa) {
+          throw new Error("All fields (Obtained Marks, Total Marks, SGPA, and CGPA) are required when Both is selected");
+        }
+      }
+
       // Clean up empty fields
       const payload = { ...data };
+      
+      // Handle marks/GPA based on marksType
       if (payload.marksType === "cgpa") {
-        delete payload.obtainedMarks;
-        delete payload.totalMarks;
-      } else {
-        delete payload.sgpa;
-        delete payload.cgpa;
+        payload.obtainedMarks = null;
+        payload.totalMarks = null;
+      } else if (payload.marksType === "marks") {
+        payload.sgpa = null;
+        payload.cgpa = null;
+      } else if (payload.marksType === "both") {
+        // Keep all fields, but set empty ones to null
+        if (!payload.obtainedMarks) payload.obtainedMarks = null;
+        if (!payload.totalMarks) payload.totalMarks = null;
+        if (!payload.sgpa) payload.sgpa = null;
+        if (!payload.cgpa) payload.cgpa = null;
       }
       delete payload.marksType;
 
@@ -353,15 +416,42 @@ export default function EnrollmentPage() {
               placeholder="Search Name, Roll No, Reg No, CNIC..."
               className="input-field !pl-9 !py-1.5 !text-sm !text-slate-900 font-bold"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setHighlightedIndex(-1);
+              }}
+              onKeyDown={(e) => {
+                const results = searchResults?.data || [];
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setHighlightedIndex((prev) =>
+                    prev < results.length - 1 ? prev + 1 : prev,
+                  );
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+                } else if (e.key === "Enter" && highlightedIndex >= 0) {
+                  e.preventDefault();
+                  selectExistingStudent(results[highlightedIndex]);
+                  setHighlightedIndex(-1);
+                }
+              }}
             />
             {searchResults?.data?.length > 0 && (
               <div className="absolute top-full left-0 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto z-50">
-                {searchResults.data.map((student: any) => (
+                {searchResults.data.map((student: any, index: number) => (
                   <div
                     key={student.id}
-                    onClick={() => selectExistingStudent(student)}
-                    className="p-2 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
+                    onClick={() => {
+                      selectExistingStudent(student);
+                      setHighlightedIndex(-1);
+                    }}
+                    className={clsx(
+                      "p-2 cursor-pointer border-b border-slate-50 last:border-0 transition-colors",
+                      highlightedIndex === index
+                        ? "bg-brand-blue/10"
+                        : "hover:bg-slate-50",
+                    )}
                   >
                     <div className="font-bold text-xs text-brand-blue">
                       {student.name}
@@ -369,6 +459,9 @@ export default function EnrollmentPage() {
                     <div className="text-[9px] text-slate-500 font-bold">
                       Roll: {student.rollNo || "N/A"} • Reg:{" "}
                       {student.registrationNo} • {student.department?.code}
+                    </div>
+                    <div className="text-[9px] text-slate-400 font-bold mt-0.5">
+                      {formatContact(student.contact)} • {formatCNIC(student.cnic)}
                     </div>
                   </div>
                 ))}
@@ -479,7 +572,7 @@ export default function EnrollmentPage() {
           <h2 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
             Academic Details
           </h2>
-          <div className="flex bg-slate-200 p-0.5 rounded-md w-28">
+          <div className="flex bg-slate-200 p-0.5 rounded-md w-36">
             <button
               type="button"
               onClick={() => set("marksType", "marks")}
@@ -503,6 +596,18 @@ export default function EnrollmentPage() {
               )}
             >
               CGPA
+            </button>
+            <button
+              type="button"
+              onClick={() => set("marksType", "both")}
+              className={clsx(
+                "flex-1 py-0.5 text-[8px] font-black uppercase rounded transition-all",
+                form.marksType === "both"
+                  ? "bg-white text-brand-blue shadow-sm"
+                  : "text-slate-400",
+              )}
+            >
+              Both
             </button>
           </div>
         </div>
@@ -575,7 +680,7 @@ export default function EnrollmentPage() {
               onChange={(e) => set("enrolledAt", e.target.value)}
             />
           </div>
-          {form.marksType === "marks" ? (
+          {(form.marksType === "marks" || form.marksType === "both") && (
             <>
               <div>
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">
@@ -600,7 +705,8 @@ export default function EnrollmentPage() {
                 />
               </div>
             </>
-          ) : (
+          )}
+          {(form.marksType === "cgpa" || form.marksType === "both") && (
             <>
               <div>
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">
@@ -657,8 +763,14 @@ export default function EnrollmentPage() {
               type="number"
               className="input-field !py-1 !text-sm !text-brand-blue font-bold border-brand-gold/50 focus:border-brand-gold"
               placeholder="0"
+              max={initialFeeVal}
               value={form.advancePaid}
-              onChange={(e) => set("advancePaid", e.target.value)}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                if (val <= initialFeeVal) {
+                  set("advancePaid", e.target.value);
+                }
+              }}
             />
           </div>
           <div>
@@ -735,10 +847,10 @@ export default function EnrollmentPage() {
                   <option value="">Select Account</option>
                   {accounts
                     ?.filter((acc: any) => {
-                      const methodType = form.paymentMethodId; // 'bank' or 'online'
+                      const methodType = form.paymentMethodId;
                       return (
                         acc.paymentMethod?.type === methodType ||
-                        acc.paymentMethodId === methodType // in case it's not populated correctly
+                        acc.paymentMethodId === methodType
                       );
                     })
                     .map((acc: any) => (
@@ -762,6 +874,21 @@ export default function EnrollmentPage() {
               </div>
             </div>
           )}
+        {Number(form.advancePaid) > 0 && form.paymentMethodId === "cash" && (
+          <div className="mx-4 mb-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in duration-300">
+            <div>
+              <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">
+                Receiver Name *
+              </label>
+              <input
+                className="input-field !py-1 !text-sm !text-slate-900 font-bold"
+                placeholder="Received by..."
+                value={form.receiverName}
+                onChange={(e) => set("receiverName", e.target.value)}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Error */}
@@ -779,17 +906,22 @@ export default function EnrollmentPage() {
       <div className="flex justify-end gap-3 pt-1">
         <button
           onClick={() => {
+            showBar();
             setForm({ ...defaultForm });
             setSelectedExistingId(null);
             setSearchQuery("");
             mutation.reset();
+            setTimeout(hideBar, 400);
           }}
           className="px-4 py-2 rounded-xl font-black text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors uppercase tracking-widest text-[10px] flex items-center gap-1.5"
         >
           <RotateCcw className="w-3 h-3" /> Reset
         </button>
         <button
-          onClick={() => mutation.mutate(form)}
+          onClick={() => {
+            showBar();
+            mutation.mutate(form);
+          }}
           disabled={mutation.isPending}
           data-submit
           className="px-6 py-2 flex-1 md:flex-none justify-center rounded-xl font-black text-white bg-brand-blue hover:bg-opacity-90 transition-colors uppercase tracking-widest text-[10px] flex items-center gap-2 shadow-lg shadow-brand-blue/30"

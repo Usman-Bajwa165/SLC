@@ -39,9 +39,9 @@ export class CreateStudentDto {
   cnic: string;
 
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   @MaxLength(20)
-  contact?: string;
+  contact: string;
 
   @IsString()
   @IsNotEmpty()
@@ -49,9 +49,9 @@ export class CreateStudentDto {
   registrationNo: string;
 
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   @MaxLength(50)
-  rollNo?: string;
+  rollNo: string;
 
   @IsInt()
   departmentId: number;
@@ -118,6 +118,10 @@ export class CreateStudentDto {
   @IsOptional()
   senderName?: string;
 
+  @IsString()
+  @IsOptional()
+  receiverName?: string;
+
   @IsDateString()
   @IsOptional()
   paymentDate?: string;
@@ -155,23 +159,23 @@ export class UpdateStudentDto {
   @Min(0)
   @Max(4)
   @IsOptional()
-  cgpa?: number;
+  cgpa?: number | null;
 
   @IsNumber()
   @Min(0)
   @Max(4)
   @IsOptional()
-  sgpa?: number;
+  sgpa?: number | null;
 
   @IsNumber()
   @Min(0)
   @IsOptional()
-  obtainedMarks?: number;
+  obtainedMarks?: number | null;
 
   @IsNumber()
   @Min(0)
   @IsOptional()
-  totalMarks?: number;
+  totalMarks?: number | null;
 
   @IsInt()
   @IsOptional()
@@ -198,6 +202,10 @@ export class UpdateStudentDto {
   @IsString()
   @IsOptional()
   senderName?: string;
+
+  @IsString()
+  @IsOptional()
+  receiverName?: string;
 
   @IsDateString()
   @IsOptional()

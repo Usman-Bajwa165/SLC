@@ -32,3 +32,17 @@ export function formatCurrency(amount: string | number | null | undefined) {
     maximumFractionDigits: 2,
   });
 }
+
+export function formatContact(contact: string | null | undefined) {
+  if (!contact) return "—";
+  const digits = contact.replace(/\D/g, "");
+  if (digits.length < 11) return contact;
+  return `${digits.substring(0, 2)} ${digits.substring(2, 5)} ${digits.substring(5)}`;
+}
+
+export function formatCNIC(cnic: string | null | undefined) {
+  if (!cnic) return "—";
+  const digits = cnic.replace(/\D/g, "");
+  if (digits.length !== 13) return cnic;
+  return `${digits.substring(0, 5)}-${digits.substring(5, 12)}-${digits.substring(12)}`;
+}

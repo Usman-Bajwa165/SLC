@@ -41,10 +41,18 @@ export function showBar() {
     hideTimer = null;
   }
   const bar = ensureBar();
-  // Ratchet forward: only advance, never go backward
+  // Ensure visibility and start from a reasonable point if hidden
+  if (bar.style.opacity === "0" || bar.style.width === "0%") {
+    bar.style.transition = "none";
+    bar.style.width = "0%";
+    bar.style.opacity = "1";
+    // Force reflow
+    bar.offsetHeight;
+    bar.style.transition = "width 500ms ease, opacity 300ms ease";
+  }
+
   const current = parseFloat(bar.style.width) || 0;
-  bar.style.opacity = "1";
-  bar.style.width = Math.min(current + 30, 85) + "%";
+  bar.style.width = Math.min(current + 25, 90) + "%";
 }
 
 export function hideBar() {
@@ -55,10 +63,16 @@ export function hideBar() {
     if (bar) {
       bar.style.opacity = "0";
       setTimeout(() => {
-        if (bar) bar.style.width = "0%";
+        if (bar) {
+          bar.style.transition = "none";
+          bar.style.width = "0%";
+          // Force reflow
+          bar.offsetHeight;
+          bar.style.transition = "width 500ms ease, opacity 300ms ease";
+        }
       }, 350);
     }
-  }, 200);
+  }, 250);
 }
 
 // ── Route-change loader (Suspense-safe) ───────────────────────────────────────
@@ -67,8 +81,27 @@ export default function TopLoader() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    showBar();
-    const t = setTimeout(hideBar, 500);
+    // Intercept clicks on links globally to show bar IMMEDIATELY
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest("a");
+      if (
+        anchor &&
+        anchor.href &&
+        !anchor.target &&
+        anchor.origin === window.location.origin
+      ) {
+        showBar();
+      }
+    };
+
+    document.addEventListener("click", handleGlobalClick);
+    return () => document.removeEventListener("click", handleGlobalClick);
+  }, []);
+
+  useEffect(() => {
+    // When route actually changes, hide the bar
+    const t = setTimeout(hideBar, 400);
     return () => clearTimeout(t);
   }, [pathname, searchParams]);
 

@@ -85,17 +85,42 @@ export class AccountsService implements OnModuleInit {
     return account;
   }
 
-  async updateAccount(id: number, dto: Partial<CreateAccountDto>) {
+  async updateAccount(
+    id: number,
+    dto: Partial<CreateAccountDto> & { currentBalance?: number },
+  ) {
     const existing = await this.findOneAccount(id);
+    let updatedData: any = {
+      label: dto.label,
+      accountNumber: dto.accountNumber,
+      branch: dto.branch,
+      paymentMethodId: dto.paymentMethodId,
+      isActive: dto.isActive,
+    };
+
+    if (dto.currentBalance !== undefined) {
+      const existingBalance = new Decimal(existing.currentBalance.toString());
+      const newBalance = new Decimal(dto.currentBalance.toString());
+      if (!newBalance.equals(existingBalance)) {
+        updatedData.currentBalance = newBalance;
+        const diff = newBalance.minus(existingBalance);
+
+        await (this.prisma as any).otherTransaction.create({
+          data: {
+            type: diff.greaterThan(0) ? "income" : "expense",
+            category: "Balance Adjustment",
+            amount: diff.abs(),
+            notes: `Manual balance adjustment. Previous: ${existingBalance.toFixed(2)}, New: ${newBalance.toFixed(2)}`,
+            accountId: id,
+            date: new Date(),
+          },
+        });
+      }
+    }
+
     const updated = await this.prisma.account.update({
       where: { id },
-      data: {
-        label: dto.label,
-        accountNumber: dto.accountNumber,
-        branch: dto.branch,
-        paymentMethodId: dto.paymentMethodId,
-        isActive: dto.isActive,
-      },
+      data: updatedData,
     });
     await this.audit.log("account", id, "update", existing, updated);
     return updated;

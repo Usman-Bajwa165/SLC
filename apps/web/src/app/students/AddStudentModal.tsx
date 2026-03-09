@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  studentsApi,
   departmentsApi,
   sessionsApi,
   accountsApi,
-  studentsApi,
 } from "@/lib/api/client";
+import { showBar, hideBar } from "@/lib/progress";
 import { clsx } from "clsx";
 import { Save, AlertCircle } from "lucide-react";
 import Modal from "@/components/ui/Modal";
@@ -128,6 +129,7 @@ export default function AddStudentModal({
 
   const mutation = useMutation({
     mutationFn: (data: any) => {
+      showBar();
       const payload = { ...data };
       if (payload.marksType === "cgpa") {
         delete payload.obtainedMarks;
@@ -172,8 +174,12 @@ export default function AddStudentModal({
       return studentsApi.create(payload);
     },
     onSuccess: () => {
+      hideBar();
       queryClient.invalidateQueries({ queryKey: ["students"] });
       onClose();
+    },
+    onError: (err: any) => {
+      hideBar();
     },
   });
 

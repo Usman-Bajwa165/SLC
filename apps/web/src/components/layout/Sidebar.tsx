@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Building2,
-  Calendar,
   Users,
   CreditCard,
   Landmark,
@@ -22,7 +21,6 @@ import { useState } from "react";
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/departments", label: "Departments", icon: Building2 },
-  { href: "/sessions", label: "Sessions", icon: Calendar },
   { href: "/students", label: "Students", icon: Users },
   { href: "/enrollment", label: "Enrollment", icon: UserPlus },
   { href: "/payments", label: "Payments", icon: CreditCard },

@@ -2,22 +2,24 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { studentsApi, departmentsApi, sessionsApi } from "@/lib/api/client";
-import Modal from "@/components/ui/Modal";
 import {
   Plus,
   Search,
   Eye,
   CreditCard,
-  ChevronRight,
   ChevronLeft,
+  ChevronRight,
   Users,
   CheckCircle2,
+  GraduationCap,
+  TrendingUp,
+  FileText,
   UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { clsx } from "clsx";
-
-import AddStudentModal from "./AddStudentModal";
+import { showBar, hideBar } from "@/lib/progress";
+import { toast } from "sonner";
 const STATUS_BADGES: Record<string, string> = {
   active: "bg-green-100 text-green-700",
   promoted: "bg-blue-100 text-blue-700",
@@ -29,27 +31,76 @@ export default function StudentsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [dept, setDept] = useState("");
+  const [sessionId, setSessionId] = useState("");
+  const [currentLevel, setCurrentLevel] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const promoteMutation = useMutation({
-    mutationFn: studentsApi.promote,
+    mutationFn: (id: number) => {
+      showBar();
+      return studentsApi.promote(id);
+    },
     onSuccess: () => {
+      hideBar();
       qc.invalidateQueries({ queryKey: ["students"] });
-      alert("Student successfully promoted to the next term!");
+      toast.success("Student successfully promoted to the next term!");
     },
     onError: (err: any) => {
-      alert(err?.response?.data?.message || String(err));
+      hideBar();
+      toast.error(err?.response?.data?.message || String(err));
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status, outstanding }: { id: number; status: string; outstanding: number }) => {
+      if (status === "graduated" && outstanding > 0) {
+        throw new Error(`Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`);
+      }
+      showBar();
+      return studentsApi.update(id, { status });
+    },
+    onSuccess: () => {
+      hideBar();
+      qc.invalidateQueries({ queryKey: ["students"] });
+      toast.success("Student status updated successfully!");
+    },
+    onError: (err: any) => {
+      hideBar();
+      toast.error(err?.message || String(err));
+    },
+  });
+
+  const graduateMutation = useMutation({
+    mutationFn: ({ id, outstanding }: { id: number; outstanding: number }) => {
+      if (outstanding > 0) {
+        throw new Error(`Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`);
+      }
+      showBar();
+      return studentsApi.update(id, { status: "graduated" });
+    },
+    onSuccess: () => {
+      hideBar();
+      qc.invalidateQueries({ queryKey: ["students"] });
+      toast.success("Student marked as graduated!");
+    },
+    onError: (err: any) => {
+      hideBar();
+      toast.error(err?.message || String(err));
     },
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["students", { q: search, department: dept, status, page }],
+    queryKey: [
+      "students",
+      { q: search, department: dept, session: sessionId, currentLevel, status, page },
+    ],
     queryFn: () =>
       studentsApi.list({
         q: search || undefined,
         department: dept ? Number(dept) : undefined,
+        session: sessionId ? Number(sessionId) : undefined,
+        currentSemester: currentLevel ? Number(currentLevel) : undefined,
         status: status || undefined,
         page,
       }),
@@ -58,13 +109,32 @@ export default function StudentsPage() {
     queryKey: ["departments"],
     queryFn: departmentsApi.list,
   });
+  const { data: sessions } = useQuery({
+    queryKey: ["sessions", dept],
+    queryFn: () => sessionsApi.list(Number(dept)),
+    enabled: !!dept,
+  });
 
   const students = data?.data || [];
   const meta = data?.meta;
 
+  // Get active levels from current students list when session is selected
+  const selectedDept = depts?.find((d: any) => d.id === Number(dept));
+  const activeLevels = new Set<number>();
+  
+  if (sessionId && students.length > 0) {
+    students.forEach((s: any) => {
+      if (s.currentSemester) {
+        activeLevels.add(s.currentSemester);
+      }
+    });
+  }
+  
+  const sortedLevels = Array.from(activeLevels).sort((a, b) => a - b);
+
   return (
-    <div className="space-y-6 animate-fade-in p-2 max-w-[1600px] mx-auto">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="h-full flex flex-col space-y-4 animate-fade-in p-2 max-w-[1600px] mx-auto overflow-hidden">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">
             Student Directory
@@ -74,39 +144,26 @@ export default function StudentsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setIsAddModalOpen(true)}
+          <Link
+            href="/enrollment"
             className="btn-primary flex items-center gap-2 group shadow-brand-gold/20 hover:scale-105 transition-all w-full md:w-auto"
           >
             <UserPlus className="w-5 h-5 group-hover:text-brand-gold transition-colors" />{" "}
-            Enroll Quick (Modal)
-          </button>
-          <Link
-            href="/enrollment"
-            className="px-5 py-2.5 border-2 border-slate-200 text-slate-500 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-colors w-full md:w-auto text-center"
-          >
-            Go to Full Page
+            Enroll New Student
           </Link>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card-premium p-4 flex items-center gap-3">
-          <div className="w-10 h-10 bg-brand-blue/5 rounded-xl flex items-center justify-center text-brand-blue">
-            <Users className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-              Total
-            </p>
-            <p className="text-lg font-black text-slate-800">
-              {meta?.total ?? 0}
-            </p>
-          </div>
-        </div>
       </div>
 
       <div className="card-premium p-4 flex flex-col md:flex-row items-center gap-4">
+        <div className="flex items-center gap-2 px-3 py-2 bg-brand-blue/5 rounded-xl">
+          <Users className="w-4 h-4 text-brand-blue" />
+          <span className="text-xs font-black text-brand-blue uppercase tracking-widest">
+            {meta?.total ?? 0} Students
+          </span>
+        </div>
         <div className="relative flex-1 w-full group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-blue transition-colors" />
           <input
@@ -121,22 +178,58 @@ export default function StudentsPage() {
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <select
-            className="input-field md:w-48"
+            className="input-field md:w-36"
             value={dept}
             onChange={(e) => {
               setDept(e.target.value);
+              setSessionId("");
               setPage(1);
             }}
           >
-            <option value="">All Departments</option>
+            <option value="">All Depts</option>
             {depts?.map((d: any) => (
               <option key={d.id} value={d.id}>
-                {d.name}
+                {d.code || d.name}
               </option>
             ))}
           </select>
           <select
-            className="input-field md:w-36"
+            className="input-field md:w-36 disabled:opacity-50 disabled:bg-slate-50"
+            value={sessionId}
+            onChange={(e) => {
+              setSessionId(e.target.value);
+              setCurrentLevel("");
+              setPage(1);
+            }}
+            disabled={!dept}
+          >
+            <option value="">All Sessions</option>
+            {sessions?.map((s: any) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input-field md:w-28 disabled:opacity-50 disabled:bg-slate-50"
+            value={currentLevel}
+            onChange={(e) => {
+              setCurrentLevel(e.target.value);
+              setPage(1);
+            }}
+            disabled={!sessionId}
+          >
+            <option value="">
+              {!dept ? "Level" : selectedDept?.offersSem ? "All Sems" : "All Years"}
+            </option>
+            {sortedLevels.map((level) => (
+              <option key={level} value={level}>
+                {selectedDept?.offersSem ? `Sem ${level}` : `Year ${level}`}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input-field md:w-32"
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
@@ -145,22 +238,23 @@ export default function StudentsPage() {
           >
             <option value="">All Status</option>
             <option value="active">Active</option>
-            <option value="promoted">Promoted</option>
             <option value="graduated">Graduated</option>
             <option value="left">Left</option>
+            <option value="deactive">Deactive</option>
           </select>
         </div>
       </div>
 
-      <div className="card-premium overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="card-premium overflow-hidden flex-1 flex flex-col min-h-0">
+        <div className="overflow-auto flex-1 h-full scrollbar-thin scrollbar-thumb-slate-200">
           <table className="w-full text-left border-collapse">
-            <thead>
+            <thead className="sticky top-0 z-20 shadow-sm transition-shadow">
               <tr className="bg-slate-50">
                 {[
                   "Student Info",
                   "Academic Track",
-                  "Outstanding",
+                  "Academic Score",
+                  "Financials",
                   "Status",
                   "Actions",
                 ].map((h) => (
@@ -169,6 +263,8 @@ export default function StudentsPage() {
                     className={clsx(
                       "px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100",
                       h === "Actions" && "text-right",
+                      h === "Financials" && "text-center",
+                      h === "Academic Score" && "text-center",
                     )}
                   >
                     {h}
@@ -206,12 +302,30 @@ export default function StudentsPage() {
                 </tr>
               ) : (
                 students.map((s: any) => {
+                  const totalPaid =
+                    s.financeRecords?.reduce(
+                      (sum: number, f: any) => sum + parseFloat(f.feePaid || 0),
+                      0,
+                    ) ?? 0;
+                  const totalDue =
+                    s.financeRecords?.reduce(
+                      (sum: number, f: any) => sum + parseFloat(f.feeDue || 0),
+                      0,
+                    ) ?? 0;
                   const outstanding =
                     s.financeRecords?.reduce(
                       (sum: number, f: any) =>
                         sum + parseFloat(f.remaining || 0),
                       0,
                     ) ?? 0;
+
+                  const totalTerms =
+                    s.programMode === "semester"
+                      ? (s.department?.semsPerYear || 2) *
+                        (s.department?.yearsDuration || 4)
+                      : s.department?.yearsDuration || 4;
+                  const isFinalTerm = (s.currentSemester || 0) >= totalTerms;
+
                   return (
                     <tr
                       key={s.id}
@@ -219,8 +333,8 @@ export default function StudentsPage() {
                     >
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-brand-blue group-hover:text-white transition-all">
-                            {s.registrationNo?.slice(-2) || "??"}
+                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-brand-blue group-hover:text-white transition-all">
+                            <GraduationCap className="w-5 h-5" />
                           </div>
                           <div>
                             <p className="text-sm font-black text-slate-800 uppercase tracking-tight">
@@ -233,7 +347,7 @@ export default function StudentsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-5">
-                        <p className="text-xs font-black text-slate-600 uppercase">
+                        <p className="text-[10px] font-black text-brand-blue uppercase tracking-tight">
                           {s.department?.name}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
@@ -245,10 +359,12 @@ export default function StudentsPage() {
                                 : "bg-orange-50 text-orange-600",
                             )}
                           >
-                            {s.programMode}
+                            {s.programMode === "semester"
+                              ? "Semester"
+                              : "Annual"}
                           </span>
                           <span className="text-[10px] font-bold text-slate-400">
-                            Sem{" "}
+                            {s.programMode === "semester" ? "Sem" : "Year"}{" "}
                             {s.currentSemester !== null &&
                             s.currentSemester !== undefined
                               ? s.currentSemester
@@ -257,37 +373,151 @@ export default function StudentsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-5">
-                        <div
-                          className={clsx(
-                            "flex items-center gap-1.5 text-xs font-black px-3 py-1.5 rounded-xl w-fit",
-                            outstanding > 0
-                              ? "bg-red-50 text-red-600"
-                              : "bg-green-50 text-green-600",
-                          )}
-                        >
-                          {outstanding > 0 ? (
-                            `PKR ${outstanding.toLocaleString()}`
+                        <div className="flex flex-col items-center gap-1">
+                          {(s.cgpa || s.sgpa) && (s.obtainedMarks || s.totalMarks) ? (
+                            <div className="flex flex-col items-center">
+                              {s.cgpa && (
+                                <p className="text-[10px] font-black text-slate-700">
+                                  CGPA:{" "}
+                                  <span className="text-brand-blue">
+                                    {s.cgpa}
+                                  </span>
+                                </p>
+                              )}
+                              {s.sgpa && (
+                                <p className="text-[9px] font-bold text-slate-400">
+                                  SGPA: {s.sgpa}
+                                </p>
+                              )}
+                              <p className="text-[10px] font-black text-slate-700 mt-1">
+                                {s.obtainedMarks || 0} / {s.totalMarks || 0}
+                              </p>
+                            </div>
+                          ) : s.cgpa || s.sgpa ? (
+                            <div className="flex flex-col items-center">
+                              {s.cgpa && (
+                                <p className="text-[10px] font-black text-slate-700">
+                                  CGPA:{" "}
+                                  <span className="text-brand-blue">
+                                    {s.cgpa}
+                                  </span>
+                                </p>
+                              )}
+                              {s.sgpa && (
+                                <p className="text-[9px] font-bold text-slate-400">
+                                  SGPA: {s.sgpa}
+                                </p>
+                              )}
+                            </div>
+                          ) : s.obtainedMarks || s.totalMarks ? (
+                            <div className="flex flex-col items-center">
+                              <p className="text-[10px] font-black text-slate-700">
+                                {s.obtainedMarks || 0} / {s.totalMarks || 0}
+                              </p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                Total Marks
+                              </p>
+                            </div>
                           ) : (
-                            <>
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Clear
-                            </>
+                            <span className="text-[10px] font-bold text-slate-300">
+                              —
+                            </span>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-5">
-                        <span
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <div className="text-right">
+                              <p className="text-[10px] font-black text-slate-800">
+                                PKR {totalPaid.toLocaleString()}
+                              </p>
+                              <p className="text-[8px] font-bold text-slate-400 uppercase">
+                                Paid / Total
+                              </p>
+                            </div>
+                            <div className="h-6 w-[1px] bg-slate-100" />
+                            <div className="text-left">
+                              <p className="text-[10px] font-black text-slate-400">
+                                {totalDue.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div
+                            className={clsx(
+                              "flex items-center gap-1.5 text-[9px] font-black px-2 py-1 rounded-lg w-fit uppercase tracking-wider",
+                              outstanding > 0
+                                ? "bg-red-50 text-red-600"
+                                : "bg-green-50 text-green-600",
+                            )}
+                          >
+                            {outstanding > 0 ? (
+                              `Outstanding: PKR ${outstanding.toLocaleString()}`
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-3 h-3" /> Fees
+                                Cleared
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <select
                           className={clsx(
-                            "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest",
+                            "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest cursor-pointer outline-none appearance-none text-center bg-transparent",
                             STATUS_BADGES[s.status] ||
                               "bg-slate-100 text-slate-500",
                           )}
+                          value={s.status}
+                          onChange={(e) => {
+                            const newStatus = e.target.value;
+                            if (newStatus === "graduated" && outstanding > 0) {
+                              toast.error(`Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`);
+                              return;
+                            }
+                            if (
+                              window.confirm(
+                                `Change status to ${newStatus}?`,
+                              )
+                            ) {
+                              updateStatusMutation.mutate({
+                                id: s.id,
+                                status: newStatus,
+                                outstanding,
+                              });
+                            }
+                          }}
                         >
-                          {s.status}
-                        </span>
+                          <option
+                            value="active"
+                            className="text-slate-900 bg-white"
+                          >
+                            ACTIVE
+                          </option>
+                          <option
+                            value="deactive"
+                            className="text-slate-900 bg-white"
+                          >
+                            DEACTIVE
+                          </option>
+                          <option
+                            value="left"
+                            className="text-slate-900 bg-white"
+                          >
+                            LEFT
+                          </option>
+                          <option
+                            value="graduated"
+                            className="text-slate-900 bg-white"
+                          >
+                            GRADUATED
+                          </option>
+                        </select>
                       </td>
                       <td className="px-6 py-5 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {s.status === "active" && (
+                          {s.status === "active" && !isFinalTerm && (
                             <button
                               onClick={() => {
                                 if (
@@ -299,10 +529,30 @@ export default function StudentsPage() {
                                 }
                               }}
                               disabled={promoteMutation.isPending}
-                              title="Promote to Next Term"
-                              className="p-2 text-slate-400 hover:text-brand-gold hover:bg-brand-gold/10 rounded-lg transition-all"
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-gold/10 text-brand-gold hover:bg-brand-gold text-[9px] hover:text-white rounded-lg font-black uppercase tracking-widest transition-all"
                             >
-                              <ChevronRight className="w-4 h-4 text-brand-gold" />
+                              <TrendingUp className="w-3 h-3" />
+                              Promote
+                            </button>
+                          )}
+                          {s.status === "active" && isFinalTerm && (
+                            <button
+                              onClick={() => {
+                                if (outstanding > 0) {
+                                  toast.error(`Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`);
+                                  return;
+                                }
+                                if (
+                                  window.confirm(`Mark ${s.name} as Graduated?`)
+                                ) {
+                                  graduateMutation.mutate({ id: s.id, outstanding });
+                                }
+                              }}
+                              disabled={graduateMutation.isPending}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-600 text-[9px] hover:text-white rounded-lg font-black uppercase tracking-widest transition-all"
+                            >
+                              <GraduationCap className="w-3 h-3" />
+                              Graduate
                             </button>
                           )}
                           <Link
@@ -313,7 +563,14 @@ export default function StudentsPage() {
                             <Eye className="w-4 h-4" />
                           </Link>
                           <Link
-                            href={`/payments/new?studentId=${s.id}`}
+                            href={`/reports/student-ledger/${s.id}`}
+                            className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                            title="Student Ledger"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </Link>
+                          <Link
+                            href={`/payments?tab=portal&studentId=${s.id}&returnUrl=/students`}
                             className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
                             title="Add Payment"
                           >
@@ -352,13 +609,6 @@ export default function StudentsPage() {
           </div>
         )}
       </div>
-
-      {isAddModalOpen && (
-        <AddStudentModal
-          isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
-        />
-      )}
     </div>
   );
 }

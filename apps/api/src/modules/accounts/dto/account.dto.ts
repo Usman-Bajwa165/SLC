@@ -19,4 +19,5 @@ export class CreateAccountDto {
   @IsString() @IsOptional() branch?: string;
   @IsOptional() openingBalance?: string;
   @IsBoolean() @IsOptional() isActive?: boolean;
+  @IsOptional() currentBalance?: number;
 }

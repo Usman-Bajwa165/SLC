@@ -7,12 +7,13 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   icon?: LucideIcon;
   iconColor?: string;
   children: ReactNode;
   footer?: ReactNode;
   maxWidth?: string;
+  headerContent?: ReactNode;
 }
 
 export default function Modal({
@@ -25,6 +26,7 @@ export default function Modal({
   children,
   footer,
   maxWidth = "max-w-md",
+  headerContent,
 }: ModalProps) {
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -50,33 +52,23 @@ export default function Modal({
         style={{ maxHeight: "calc(100vh - 2rem)" }}
       >
         {/* Fixed Header */}
-        <div className="p-6 md:p-8 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center gap-4">
-            {Icon && (
-              <div
-                className={clsx(
-                  "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0",
-                  iconColor.replace("text-", "bg-").concat("/10"),
-                  iconColor,
-                )}
-              >
-                <Icon className="w-6 h-6" />
-              </div>
-            )}
-            <div>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none">
+        <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 md:p-8 text-white shrink-0 flex items-center justify-between">
+          <div className="flex items-center gap-6 flex-1">
+            <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-sm shrink-0">
+              <span className="text-2xl font-black">{headerContent}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xl font-black uppercase tracking-tight leading-none mb-2">
                 {title}
               </h3>
-              {subtitle && (
-                <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest mt-1.5 opacity-60">
-                  {subtitle}
-                </p>
-              )}
+              <div className="flex flex-wrap items-center gap-3 text-[10px] font-bold">
+                {subtitle}
+              </div>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 -mr-2 text-slate-900 hover:bg-slate-50 rounded-xl transition-all"
+            className="p-2 text-white hover:bg-white/10 rounded-xl transition-all shrink-0"
           >
             <X className="w-6 h-6" />
           </button>

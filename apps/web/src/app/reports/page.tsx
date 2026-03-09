@@ -10,6 +10,7 @@ import {
 } from "@/lib/api/client";
 import { cn, formatDateTime, formatCurrency } from "@/lib/utils";
 import { exportToPDF } from "@/lib/report-utils";
+import { showBar, hideBar } from "@/lib/progress";
 import Link from "next/link";
 import Modal from "@/components/ui/Modal";
 import {
@@ -41,6 +42,7 @@ export default function ReportsPage() {
   );
 
   const changeTab = (t: string) => {
+    showBar();
     setTab(t);
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", t);
@@ -49,17 +51,6 @@ export default function ReportsPage() {
 
   return (
     <div className="h-full flex flex-col space-y-1 animate-fade-in px-4 pb-1 pt-0 max-w-[1640px] mx-auto overflow-hidden print:overflow-visible print:h-auto print:max-w-none print:px-0">
-      <div className="flex items-end justify-between py-2 border-b border-slate-100/60 print:hidden">
-        <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
-            Institutional Reports
-          </h2>
-        </div>
-        <p className="text-slate-400 font-black text-[9px] uppercase tracking-[0.15em] hidden md:block">
-          Real-time financial auditing and student enrollment analytics.
-        </p>
-      </div>
-
       <div className="flex-1 flex flex-col min-h-0 card-premium overflow-hidden bg-white shadow-2xl border-slate-200/60 print:shadow-none print:border-none print:overflow-visible">
         <div className="flex border-b border-slate-100 bg-slate-50/50 p-2 gap-2 print:hidden">
           {TABS.map((t) => (
@@ -250,7 +241,7 @@ function OutstandingReport() {
     <div className="h-full flex flex-col p-3 space-y-3 overflow-hidden print:p-0 print:overflow-visible print:h-auto">
       {/* Filtering Section */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-50/50 p-4 rounded-3xl border border-slate-100 print:hidden">
-        <div className="md:col-span-3 relative group">
+        <div className="md:col-span-2 relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-blue transition-colors" />
           <input
             type="text"
@@ -315,12 +306,14 @@ function OutstandingReport() {
           <a
             href={`${process.env.NEXT_PUBLIC_API_URL}/reports/outstanding/export?departmentId=${filters.departmentId}${filters.sessionId ? `&sessionId=${filters.sessionId}` : ""}`}
             download={`Students_${new Date().toISOString().split("T")[0]}.csv`}
+            onClick={() => showBar()}
             className="flex-1 btn-primary flex items-center justify-center gap-2 text-[10px] px-3 py-2 shadow-lg shadow-brand-blue/20"
           >
             <Download className="w-3.5 h-3.5" /> CSV
           </a>
           <button
             onClick={() => {
+              showBar();
               exportToPDF({
                 title: "STUDENT OUTSTANDING",
                 filename: "Students",
@@ -363,13 +356,20 @@ function OutstandingReport() {
                   },
                 ],
               });
+              setTimeout(hideBar, 500);
             }}
             className="flex-1 bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-3 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
           >
             <FileText className="w-3.5 h-3.5" /> PDF
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={() => {
+              showBar();
+              setTimeout(() => {
+                hideBar();
+                window.print();
+              }, 400);
+            }}
             className="flex-1 bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-3 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
           >
             <Printer className="w-3.5 h-3.5" /> Print
@@ -593,8 +593,8 @@ function DailyReceiptsReport() {
 
   return (
     <div className="h-full flex flex-col p-3 space-y-3 overflow-hidden">
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
-        <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap md:flex-nowrap gap-3 bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
+        <div className="flex-1 min-w-[120px] flex flex-col gap-1">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
             Report Date
           </label>
@@ -605,7 +605,7 @@ function DailyReceiptsReport() {
             onChange={(e) => setFilters({ ...filters, date: e.target.value })}
           />
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex-1 min-w-[120px] flex flex-col gap-1">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
             Payment Method
           </label>
@@ -628,7 +628,7 @@ function DailyReceiptsReport() {
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex-1 min-w-[120px] flex flex-col gap-1">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
             Specific Account
           </label>
@@ -648,7 +648,7 @@ function DailyReceiptsReport() {
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex-1 min-w-[120px] flex flex-col gap-1">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
             Department
           </label>
@@ -671,7 +671,7 @@ function DailyReceiptsReport() {
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex-[0.7] min-w-[100px] flex flex-col gap-1">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
             Session
           </label>
@@ -691,16 +691,18 @@ function DailyReceiptsReport() {
             ))}
           </select>
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex-none w-full md:w-auto flex items-end gap-2">
           <a
             href={`${process.env.NEXT_PUBLIC_API_URL}/reports/daily-receipts/export?date=${filters.date}${filters.methodId ? `&methodId=${filters.methodId}` : ""}${filters.accountId ? `&accountId=${filters.accountId}` : ""}${filters.departmentId ? `&departmentId=${filters.departmentId}` : ""}${filters.sessionId ? `&sessionId=${filters.sessionId}` : ""}`}
             download={`Daily Receipts_${filters.date}.csv`}
+            onClick={() => showBar()}
             className="flex-1 btn-primary flex items-center justify-center gap-2 text-[10px] px-3 py-2 shadow-lg shadow-brand-blue/20"
           >
             <Download className="w-3.5 h-3.5" /> CSV
           </a>
           <button
             onClick={() => {
+              showBar();
               exportToPDF({
                 title: "DAILY RECEIPTS",
                 filename: "Daily Receipts",
@@ -734,13 +736,20 @@ function DailyReceiptsReport() {
                   },
                 ],
               });
+              setTimeout(hideBar, 500);
             }}
             className="flex-1 bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-3 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
           >
             <FileText className="w-3.5 h-3.5" /> PDF
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={() => {
+              showBar();
+              setTimeout(() => {
+                hideBar();
+                window.print();
+              }, 400);
+            }}
             className="flex-1 bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-3 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
           >
             <Printer className="w-3.5 h-3.5" /> Print
@@ -847,12 +856,25 @@ function AccountsReport() {
     queryFn: accountsApi.accounts,
   });
 
+  const { data: dashboardRaw } = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: reportsApi.dashboard,
+  });
+
   const allAccounts = (accounts as any)?.data || accounts || [];
+  const dashboard = dashboardRaw || {};
+  const cashBalance = Number(dashboard.cashBalance || 0);
 
   return (
     <div className="h-full flex flex-col p-3 space-y-3 overflow-hidden print:p-0 print:overflow-visible print:h-auto">
       <div className="flex items-center justify-between print:hidden">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1 mr-4">
+          <SummaryCard
+            label="Cash in Hand"
+            value={`PKR ${formatCurrency(cashBalance)}`}
+            icon={<Wallet className="w-5 h-5" />}
+            color="green"
+          />
           <SummaryCard
             label="Total Balance"
             value={`PKR ${formatCurrency(allAccounts.reduce((s: any, a: any) => s + Number(a.currentBalance || 0), 0))}`}
@@ -869,6 +891,7 @@ function AccountsReport() {
         <div className="flex gap-2">
           <button
             onClick={() => {
+              showBar();
               const headers = ["Account", "Category", "Number", "Balance"];
               const rows = allAccounts.map((acc: any) => [
                 acc.label,
@@ -886,6 +909,7 @@ function AccountsReport() {
               link.href = URL.createObjectURL(blob);
               link.download = `Accounts_${new Date().toISOString().split("T")[0]}.csv`;
               link.click();
+              setTimeout(hideBar, 500);
             }}
             className="bg-brand-blue text-white rounded-xl flex items-center justify-center gap-2 text-[10px] px-4 py-2 hover:bg-brand-blue/90 transition-colors shadow-sm font-black uppercase tracking-widest"
           >
@@ -893,6 +917,7 @@ function AccountsReport() {
           </button>
           <button
             onClick={() => {
+              showBar();
               exportToPDF({
                 title: "FINANCIAL ACCOUNTS",
                 filename: "Accounts",
@@ -914,13 +939,20 @@ function AccountsReport() {
                   },
                 ],
               });
+              setTimeout(hideBar, 500);
             }}
             className="bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-4 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
           >
             <FileText className="w-4 h-4" /> PDF
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={() => {
+              showBar();
+              setTimeout(() => {
+                hideBar();
+                window.print();
+              }, 400);
+            }}
             className="bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-4 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
           >
             <Printer className="w-4 h-4" /> Print

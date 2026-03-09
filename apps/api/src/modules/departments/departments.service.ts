@@ -58,12 +58,16 @@ export class DepartmentsService {
         );
     }
 
+    const validFeeStructures = feeStructures?.filter(
+      (f) => f && typeof f === 'object' && Object.keys(f).length > 0 && !Array.isArray(f)
+    );
+
     const dept = await this.prisma.department.create({
       data: {
         ...data,
         feeStructures:
-          feeStructures && feeStructures.length > 0
-            ? { create: feeStructures }
+          validFeeStructures && validFeeStructures.length > 0
+            ? { create: validFeeStructures }
             : undefined,
       },
       include: { feeStructures: true },

@@ -173,19 +173,22 @@ export default function AccountLedgerPage() {
                       AC: {account.accountNumber}
                     </span>
                   )}
+                  {account?.branch && (
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                      {account.branch}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full md:w-auto">
-              <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 min-w-[180px]">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Current Balance
-                </p>
-                <p className="text-2xl font-black text-white mt-1">
-                  PKR {formatCurrency(account?.currentBalance || 0)}
-                </p>
-              </div>
+            <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 min-w-[180px]">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Current Balance
+              </p>
+              <p className="text-2xl font-black text-white mt-1">
+                PKR {formatCurrency(account?.currentBalance || 0)}
+              </p>
             </div>
           </div>
         </div>
@@ -241,6 +244,7 @@ export default function AccountLedgerPage() {
                 <tr>
                   <th className="px-6 py-4">Date / Reference</th>
                   <th className="px-6 py-4">Transaction Details</th>
+                  <th className="px-6 py-4">From</th>
                   <th className="px-6 py-4">Category</th>
                   <th className="px-6 py-4 text-right">Inflow / Outflow</th>
                 </tr>
@@ -249,7 +253,7 @@ export default function AccountLedgerPage() {
                 {logs.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={5}
                       className="px-6 py-12 text-center text-slate-400 font-medium italic"
                     >
                       No transactions found for this account.
@@ -272,6 +276,11 @@ export default function AccountLedgerPage() {
                       <td className="px-6 py-5">
                         <p className="text-sm font-bold text-slate-700">
                           {log.description}
+                        </p>
+                      </td>
+                      <td className="px-6 py-5">
+                        <p className="text-sm font-bold text-slate-700">
+                          {log.senderName || "-"}
                         </p>
                       </td>
                       <td className="px-6 py-5">

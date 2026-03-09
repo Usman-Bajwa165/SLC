@@ -11,10 +11,12 @@ import {
   Activity,
   Calendar,
   Layers,
-  GraduationCap,
-  DollarSign,
   Landmark,
+  Wallet,
   Settings,
+  GraduationCap,
+  CreditCard,
+  Globe2,
 } from "lucide-react";
 import Link from "next/link";
 import { clsx } from "clsx";
@@ -124,7 +126,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Primary KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <StatCard
           title="Total Enrollment"
           value={d.totalActiveStudents ?? "0"}
@@ -140,18 +142,22 @@ export default function DashboardPage() {
           icon={TrendingUp}
         />
         <StatCard
-          title="Total Receivables"
-          value={`PKR ${Number(d.totalOutstanding || 0).toLocaleString()}`}
-          change="-2.1%"
-          trend="down"
-          icon={DollarSign}
+          title="Total Cash"
+          value={`PKR ${Number(d.cashBalance || 0).toLocaleString()}`}
+          trend="none"
+          icon={Banknote}
         />
         <StatCard
-          title="Operational Buffers"
-          value={d.accounts?.length ?? 0}
-          change="Optimal"
+          title="Bank Balance"
+          value={`PKR ${Number(d.bankBalance || 0).toLocaleString()}`}
           trend="none"
-          icon={Layers}
+          icon={Landmark}
+        />
+        <StatCard
+          title="Online Accounts"
+          value={`PKR ${Number(d.onlineBalance || 0).toLocaleString()}`}
+          trend="none"
+          icon={Globe2}
         />
       </div>
 
@@ -179,7 +185,13 @@ export default function DashboardPage() {
           </div>
           <div className="flex-1 w-full -ml-4">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
+              <AreaChart
+                data={
+                  chartData && chartData.length > 0
+                    ? chartData
+                    : [{ name: "N/A", amount: 0 }]
+                }
+              >
                 <defs>
                   <linearGradient id="colorAmt" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#1e3a8a" stopOpacity={0.1} />
@@ -253,9 +265,12 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
-            <button className="w-full mt-6 py-4 bg-slate-50 text-slate-500 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-100 transition-colors">
+            <Link
+              href="/accounts"
+              className="w-full mt-6 py-4 bg-slate-50 text-slate-500 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-100 transition-colors flex items-center justify-center"
+            >
               Manage All Accounts
-            </button>
+            </Link>
           </div>
         </div>
       </div>
