@@ -313,7 +313,10 @@ export class StudentsService {
 
     const result = await this.prisma.$transaction(async (tx) => {
       // Handle semester/year change
-      if (currentSemester !== undefined && currentSemester !== existing.currentSemester) {
+      if (
+        currentSemester !== undefined &&
+        currentSemester !== existing.currentSemester
+      ) {
         const activeFinance = await tx.studentFinance.findFirst({
           where: { studentId: id, isSnapshot: false },
           orderBy: { createdAt: "desc" },
@@ -324,8 +327,12 @@ export class StudentsService {
           const newTerm = currentSemester;
           const currentFeeDue = new Decimal(activeFinance.feeDue.toString());
           const currentPaid = new Decimal(activeFinance.feePaid.toString());
-          const currentCarryOver = new Decimal(activeFinance.carryOver.toString());
-          const currentRemaining = new Decimal(activeFinance.remaining.toString());
+          const currentCarryOver = new Decimal(
+            activeFinance.carryOver.toString(),
+          );
+          const currentRemaining = new Decimal(
+            activeFinance.remaining.toString(),
+          );
 
           if (newTerm > oldTerm) {
             // Promoted forward - keep fee, add remaining to carryover
@@ -333,7 +340,10 @@ export class StudentsService {
               where: { id: activeFinance.id },
               data: {
                 carryOver: currentCarryOver.plus(currentRemaining),
-                remaining: currentFeeDue.plus(currentCarryOver).plus(currentRemaining).minus(currentPaid),
+                remaining: currentFeeDue
+                  .plus(currentCarryOver)
+                  .plus(currentRemaining)
+                  .minus(currentPaid),
               },
             });
           } else {
@@ -342,7 +352,9 @@ export class StudentsService {
             await tx.studentFinance.update({
               where: { id: activeFinance.id },
               data: {
-                remaining: newRemaining.greaterThan(0) ? newRemaining : new Decimal(0),
+                remaining: newRemaining.greaterThan(0)
+                  ? newRemaining
+                  : new Decimal(0),
               },
             });
           }
@@ -364,8 +376,12 @@ export class StudentsService {
       if (initialFeeAmount && activeFinance) {
         const newFeeDue = new Decimal(initialFeeAmount);
         const currentPaid = new Decimal(activeFinance.feePaid.toString());
-        const currentCarryOver = new Decimal(activeFinance.carryOver.toString());
-        const newRemaining = newFeeDue.plus(currentCarryOver).minus(currentPaid);
+        const currentCarryOver = new Decimal(
+          activeFinance.carryOver.toString(),
+        );
+        const newRemaining = newFeeDue
+          .plus(currentCarryOver)
+          .minus(currentPaid);
 
         await tx.studentFinance.update({
           where: { id: activeFinance.id },
@@ -407,9 +423,9 @@ export class StudentsService {
             senderName: senderName || null,
             receiverName: receiverName || null,
             notes: senderName
-              ? `Sender: ${senderName} | Payment from Profile Update`
+              ? `Sender: ${senderName}`
               : receiverName
-                ? `Receiver: ${receiverName} | Payment from Profile Update`
+                ? `Receiver: ${receiverName}`
                 : "Payment from Profile Update",
           },
         });
@@ -520,7 +536,7 @@ export class StudentsService {
     // Compute carryover from all non-snapshot finance records
     const activeFinance = await this.prisma.studentFinance.findMany({
       where: { studentId: id, isSnapshot: false },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     const totalRemaining = activeFinance.reduce(
@@ -529,10 +545,11 @@ export class StudentsService {
     );
 
     // Use previous term's fee as base fee for new term
-    const previousTermFee = activeFinance.length > 0 
-      ? new Decimal(activeFinance[0].feeDue.toString())
-      : new Decimal(0);
-    
+    const previousTermFee =
+      activeFinance.length > 0
+        ? new Decimal(activeFinance[0].feeDue.toString())
+        : new Decimal(0);
+
     // If no previous fee, get from fee structure
     let baseFee = previousTermFee;
     if (baseFee.isZero()) {
@@ -544,7 +561,7 @@ export class StudentsService {
         ? new Decimal(feeStructure.feeAmount.toString())
         : new Decimal(0);
     }
-    
+
     const newFeeDue = baseFee;
     const totalRemainingForTerm = baseFee.plus(totalRemaining);
     const termLabel = this.buildTermLabel(student.programMode, nextTerm);
