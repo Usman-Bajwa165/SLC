@@ -35,30 +35,13 @@ import {
   Pie,
 } from "recharts";
 
-function StatCard({ title, value, change, icon: Icon, trend }: any) {
+function StatCard({ title, value, icon: Icon }: any) {
   return (
     <div className="card-premium p-6 group">
       <div className="flex justify-between items-start">
         <div className="p-3 rounded-2xl bg-slate-50 text-brand-blue group-hover:bg-brand-blue group-hover:text-white transition-all duration-300">
           <Icon className="w-6 h-6" />
         </div>
-        {trend && (
-          <div
-            className={clsx(
-              "flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wider",
-              trend === "up"
-                ? "bg-green-50 text-green-600"
-                : "bg-red-50 text-red-600",
-            )}
-          >
-            {trend === "up" ? (
-              <ArrowUpRight className="w-3 h-3" />
-            ) : (
-              <ArrowDownRight className="w-3 h-3" />
-            )}
-            {change}
-          </div>
-        )}
       </div>
       <div className="mt-4">
         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
@@ -130,33 +113,26 @@ export default function DashboardPage() {
         <StatCard
           title="Total Enrollment"
           value={d.totalActiveStudents ?? "0"}
-          change="+12% vs LY"
-          trend="up"
           icon={Users}
         />
         <StatCard
           title="Revenue (Today)"
           value={`PKR ${Number(d.todayReceived || 0).toLocaleString()}`}
-          change="+5.2%"
-          trend="up"
           icon={TrendingUp}
         />
         <StatCard
           title="Total Cash"
           value={`PKR ${Number(d.cashBalance || 0).toLocaleString()}`}
-          trend="none"
           icon={Banknote}
         />
         <StatCard
           title="Bank Balance"
           value={`PKR ${Number(d.bankBalance || 0).toLocaleString()}`}
-          trend="none"
           icon={Landmark}
         />
         <StatCard
           title="Online Accounts"
           value={`PKR ${Number(d.onlineBalance || 0).toLocaleString()}`}
-          trend="none"
           icon={Globe2}
         />
       </div>
@@ -239,12 +215,12 @@ export default function DashboardPage() {
         {/* Secondary Info / Quick Actions Sidebar */}
         <div className="space-y-8 h-full">
           {/* Liquidity Section */}
-          <div className="card-premium p-8 h-full flex flex-col">
+          <div className="card-premium p-8 flex flex-col h-[400px]">
             <h3 className="text-lg font-black text-slate-800 mb-6">
               Liquidity Pool
             </h3>
-            <div className="space-y-4 flex-1">
-              {d.accounts?.slice(0, 5).map((a: any) => (
+            <div className="space-y-4 flex-1 overflow-y-auto pr-2">
+              {d.accounts?.map((a: any) => (
                 <div
                   key={a.label}
                   className="group p-4 bg-slate-50 rounded-2xl hover:bg-brand-blue transition-all duration-300"
@@ -267,7 +243,7 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/accounts"
-              className="w-full mt-6 py-4 bg-slate-50 text-slate-500 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-100 transition-colors flex items-center justify-center"
+              className="w-full mt-6 py-4 bg-slate-50 text-slate-500 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-100 transition-colors flex items-center justify-center flex-shrink-0"
             >
               Manage All Accounts
             </Link>

@@ -537,6 +537,10 @@ export default function AccountsPage() {
     );
   }
 
+  const cashBalance = Number(dashboard.cashBalance || 0);
+  const bankBalance = Number(dashboard.bankBalance || 0);
+  const onlineBalance = Number(dashboard.onlineBalance || 0);
+
   const filteredAccounts = accounts.filter((acc: any) => {
     if (activeTab === "all") return true;
     return acc.paymentMethod?.type === activeTab;
@@ -545,11 +549,7 @@ export default function AccountsPage() {
   const totalBalance = accounts.reduce(
     (acc: number, curr: any) => acc + Number(curr.currentBalance || 0),
     0,
-  );
-
-  const cashBalance = Number(dashboard.cashBalance || 0);
-  const bankBalance = Number(dashboard.bankBalance || 0);
-  const onlineBalance = Number(dashboard.onlineBalance || 0);
+  ) + cashBalance;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">

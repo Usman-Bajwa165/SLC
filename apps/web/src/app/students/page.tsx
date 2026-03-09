@@ -35,6 +35,7 @@ export default function StudentsPage() {
   const [currentLevel, setCurrentLevel] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const promoteMutation = useMutation({
     mutationFn: (id: number) => {
@@ -118,6 +119,62 @@ export default function StudentsPage() {
   const students = data?.data || [];
   const meta = data?.meta;
 
+  const showBulkActions = dept && sessionId && currentLevel;
+
+  const toggleSelection = (id: number) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.length === students.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(students.map((s: any) => s.id));
+    }
+  };
+
+  const bulkPromoteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      showBar();
+      const results = await Promise.allSettled(
+        ids.map(id => studentsApi.promote(id))
+      );
+      return results;
+    },
+    onSuccess: () => {
+      hideBar();
+      qc.invalidateQueries({ queryKey: ["students"] });
+      setSelectedIds([]);
+      toast.success("Students promoted successfully!");
+    },
+    onError: (err: any) => {
+      hideBar();
+      toast.error(err?.message || String(err));
+    },
+  });
+
+  const bulkGraduateMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      showBar();
+      const results = await Promise.allSettled(
+        ids.map(id => studentsApi.update(id, { status: "graduated" }))
+      );
+      return results;
+    },
+    onSuccess: () => {
+      hideBar();
+      qc.invalidateQueries({ queryKey: ["students"] });
+      setSelectedIds([]);
+      toast.success("Students graduated successfully!");
+    },
+    onError: (err: any) => {
+      hideBar();
+      toast.error(err?.message || String(err));
+    },
+  });
+
   // Get active levels from current students list when session is selected
   const selectedDept = depts?.find((d: any) => d.id === Number(dept));
   const activeLevels = new Set<number>();
@@ -144,6 +201,94 @@ export default function StudentsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {selectedIds.length > 0 && (
+            <>
+              <button
+                onClick={() => {
+                  const idsWithDues = students
+                    .filter((s: any) => {
+                      if (!selectedIds.includes(s.id)) return false;
+                      const outstanding = s.financeRecords?.reduce(
+                        (sum: number, f: any) => sum + parseFloat(f.remaining || 0),
+                        0,
+                      ) ?? 0;
+                      return outstanding > 0;
+                    })
+                    .map((s: any) => s.id);
+                  
+                  setSelectedIds(prev => prev.filter(id => !idsWithDues.includes(id)));
+                  toast.success(`Unchecked ${idsWithDues.length} students with outstanding dues`);
+                }}
+                className="btn-secondary flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Uncheck Dues
+              </button>
+              {(() => {
+                const selectedStudents = students.filter((s: any) => selectedIds.includes(s.id));
+                const allAtFinalTerm = selectedStudents.every((s: any) => {
+                  const totalTerms = s.programMode === "semester"
+                    ? (s.department?.semsPerYear || 2) * (s.department?.yearsDuration || 4)
+                    : s.department?.yearsDuration || 4;
+                  return (s.currentSemester || 0) >= totalTerms;
+                });
+
+                if (allAtFinalTerm) {
+                  return (
+                    <button
+                      onClick={() => {
+                        const withDues = selectedStudents.filter((s: any) => {
+                          const outstanding = s.financeRecords?.reduce(
+                            (sum: number, f: any) => sum + parseFloat(f.remaining || 0),
+                            0,
+                          ) ?? 0;
+                          return outstanding > 0;
+                        });
+                        
+                        if (withDues.length > 0) {
+                          toast.error(`Cannot graduate: ${withDues.length} students have outstanding dues. Please uncheck them first.`);
+                          return;
+                        }
+                        
+                        if (window.confirm(`Graduate ${selectedIds.length} selected students?`)) {
+                          bulkGraduateMutation.mutate(selectedIds);
+                        }
+                      }}
+                      className="btn-primary flex items-center gap-2 bg-purple-600 hover:bg-purple-700"
+                    >
+                      <GraduationCap className="w-4 h-4" /> Graduate All ({selectedIds.length})
+                    </button>
+                  );
+                } else {
+                  return (
+                    <button
+                      onClick={() => {
+                        const withDues = selectedStudents.filter((s: any) => {
+                          const outstanding = s.financeRecords?.reduce(
+                            (sum: number, f: any) => sum + parseFloat(f.remaining || 0),
+                            0,
+                          ) ?? 0;
+                          return outstanding > 0;
+                        });
+                        
+                        if (withDues.length > 0) {
+                          if (window.confirm(`${selectedIds.length} selected. ${withDues.length} students have outstanding dues. Still want to promote them?`)) {
+                            bulkPromoteMutation.mutate(selectedIds);
+                          }
+                        } else {
+                          if (window.confirm(`Promote ${selectedIds.length} selected students?`)) {
+                            bulkPromoteMutation.mutate(selectedIds);
+                          }
+                        }
+                      }}
+                      className="btn-primary flex items-center gap-2 bg-brand-gold hover:bg-brand-gold/90"
+                    >
+                      <TrendingUp className="w-4 h-4" /> Promote All ({selectedIds.length})
+                    </button>
+                  );
+                }
+              })()}
+            </>
+          )}
           <Link
             href="/enrollment"
             className="btn-primary flex items-center gap-2 group shadow-brand-gold/20 hover:scale-105 transition-all w-full md:w-auto"
@@ -250,6 +395,16 @@ export default function StudentsPage() {
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 z-20 shadow-sm transition-shadow">
               <tr className="bg-slate-50">
+                {showBulkActions && (
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-12">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.length === students.length && students.length > 0}
+                      onChange={toggleAll}
+                      className="w-4 h-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue cursor-pointer"
+                    />
+                  </th>
+                )}
                 {[
                   "Student Info",
                   "Academic Track",
@@ -257,9 +412,9 @@ export default function StudentsPage() {
                   "Financials",
                   "Status",
                   "Actions",
-                ].map((h) => (
+                ].map((h, i) => (
                   <th
-                    key={h}
+                    key={i}
                     className={clsx(
                       "px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100",
                       h === "Actions" && "text-right",
@@ -331,6 +486,16 @@ export default function StudentsPage() {
                       key={s.id}
                       className="hover:bg-slate-50/50 transition-colors group"
                     >
+                      {showBulkActions && (
+                        <td className="px-6 py-5">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(s.id)}
+                            onChange={() => toggleSelection(s.id)}
+                            className="w-4 h-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue cursor-pointer"
+                          />
+                        </td>
+                      )}
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-brand-blue group-hover:text-white transition-all">

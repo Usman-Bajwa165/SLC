@@ -32,12 +32,7 @@ const EXPENSE_CATEGORIES = [
   "Others",
 ];
 
-const INCOME_CATEGORIES = [
-  "Donation",
-  "Grant",
-  "Government Aid",
-  "Others",
-];
+const INCOME_CATEGORIES = ["Donation", "Grant", "Government Aid", "Others"];
 
 export default function FinancePage() {
   const searchParams = useSearchParams();
@@ -59,20 +54,7 @@ export default function FinancePage() {
     categories: [] as string[],
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["other-finance", tab, filters],
-    queryFn: () => {
-      const params: any = { type: tab, ...filters };
-      // Send first category if multiple selected (backend expects single category)
-      if (filters.categories.length > 0) {
-        params.category = filters.categories[0];
-        delete params.categories;
-      }
-      return financeApi.list(params);
-    },
-  });
-
-  const { data: allTransactions } = useQuery({
+  const { data: allTransactions, isLoading } = useQuery({
     queryKey: ["other-finance-all", tab],
     queryFn: () => financeApi.list({ type: tab }),
   });
@@ -88,43 +70,62 @@ export default function FinancePage() {
     enabled: tab === "income",
   });
 
-  const transactions = data?.items || [];
-  const studentFees = tab === "income" ? (studentFeePayments?.data || []).map((p: any) => ({
-    id: `payment-${p.id}`,
-    category: "Student Fees",
-    date: p.date,
-    notes: `Payment from ${p.student?.name || 'Student'}`,
-    amount: p.amount,
-    accountId: p.accountId,
-    account: p.account,
-  })) : [];
-  
-  const allRecords = [...transactions, ...studentFees].sort((a, b) => 
-    new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
-  
-  const totalItems = allRecords.length;
+  const allTxns = allTransactions?.items || [];
+  const studentFees =
+    tab === "income"
+      ? (studentFeePayments?.data || []).map((p: any) => ({
+          id: `payment-${p.id}`,
+          category: "Student Fees",
+          date: p.date,
+          notes: `Payment from ${p.student?.name || 'Student'} - ${p.student?.registrationNo || 'N/A'}`,
+          amount: p.amount,
+          accountId: p.accountId,
+          account: p.account,
+          senderName: p.senderName,
+          receiverName: p.receiverName,
+        }))
+      : [];
 
-  // Filter by multiple categories on frontend
-  const filteredTransactions =
-    filters.categories.length > 0
-      ? allRecords.filter((t: any) => filters.categories.includes(t.category))
-      : allRecords;
+  const allRecords = [...allTxns, ...studentFees].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
+
+  // Filter by categories and date range on frontend
+  let filteredTransactions = allRecords;
+
+  if (filters.categories.length > 0) {
+    filteredTransactions = filteredTransactions.filter((t: any) =>
+      filters.categories.includes(t.category),
+    );
+  }
+
+  if (filters.dateFrom) {
+    filteredTransactions = filteredTransactions.filter(
+      (t: any) => new Date(t.date) >= new Date(filters.dateFrom),
+    );
+  }
+
+  if (filters.dateTo) {
+    filteredTransactions = filteredTransactions.filter(
+      (t: any) => new Date(t.date) <= new Date(filters.dateTo),
+    );
+  }
+
+  const totalItems = filteredTransactions.length;
 
   const totalAmount = filteredTransactions.reduce(
     (sum: number, t: any) => sum + Number(t.amount || 0),
     0,
   );
 
-  // Calculate totals by payment method type
-  const allTxns = allTransactions?.items || [];
+  // Calculate totals by payment method type from filtered records
   const accountsList = (accounts as any)?.data || accounts || [];
 
-  const cashTotal = allTxns
+  const cashTotal = filteredTransactions
     .filter((t: any) => !t.accountId)
     .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
 
-  const bankTotal = allTxns
+  const bankTotal = filteredTransactions
     .filter((t: any) => {
       if (!t.accountId) return false;
       const acc = accountsList.find((a: any) => a.id === t.accountId);
@@ -132,7 +133,7 @@ export default function FinancePage() {
     })
     .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
 
-  const onlineTotal = allTxns
+  const onlineTotal = filteredTransactions
     .filter((t: any) => {
       if (!t.accountId) return false;
       const acc = accountsList.find((a: any) => a.id === t.accountId);
@@ -141,7 +142,9 @@ export default function FinancePage() {
     .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
 
   const dCategories =
-    tab === "expense" ? EXPENSE_CATEGORIES : [...INCOME_CATEGORIES, "Student Fees"];
+    tab === "expense"
+      ? EXPENSE_CATEGORIES
+      : [...INCOME_CATEGORIES, "Student Fees"];
 
   return (
     <div className="space-y-6 animate-fade-in p-2 max-w-[1600px] mx-auto">
@@ -153,11 +156,12 @@ export default function FinancePage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">
-            Institutional Finance
+            Institutional Finance{" "}
+            <span className="text-slate-500 font-medium text-base ml-3">
+              Manage operational income and expenditures outside of student
+              fees.
+            </span>
           </h2>
-          <p className="text-slate-500 font-medium mt-1">
-            Manage operational income and expenditures outside of student fees.
-          </p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
@@ -288,7 +292,7 @@ export default function FinancePage() {
       </div>
 
       {/* Filters + Table */}
-      <div className="card-premium bg-white p-6 overflow-hidden flex flex-col h-[calc(100vh-32rem)]">
+      <div className="card-premium bg-white p-6 overflow-hidden flex flex-col h-[calc(100vh-12rem)]">
         <div className="flex flex-wrap items-end gap-3 mb-6 flex-shrink-0">
           {/* Date Range */}
           <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
@@ -363,115 +367,128 @@ export default function FinancePage() {
         </div>
 
         <div className="flex-1 overflow-hidden rounded-2xl border border-slate-50 flex flex-col">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-100">
-              <tr>
-                <th className="text-left px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  Date
-                </th>
-                <th className="text-left px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  Category
-                </th>
-                <th className="text-left px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  Description
-                </th>
-                <th className="text-left px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  Account
-                </th>
-                <th className="text-right px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  Amount
-                </th>
-              </tr>
-            </thead>
-          </table>
-          <div className="flex-1 overflow-y-auto">
+          <div className="overflow-x-auto flex-1">
             <table className="w-full text-sm">
-            <tbody className="divide-y divide-slate-50">
-              {isLoading ? (
-                [...Array(5)].map((_, i) => (
-                  <tr key={i}>
-                    <td colSpan={5} className="px-4 py-5">
-                      <div className="h-10 bg-slate-50 rounded-xl animate-pulse" />
+              <thead className="bg-slate-50 border-b border-slate-100 sticky top-0">
+                <tr>
+                  <th className="text-left px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[180px]">
+                    Date
+                  </th>
+                  <th className="text-left px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[140px]">
+                    Category
+                  </th>
+                  <th className="text-left px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    Description
+                  </th>
+                  <th className="text-left px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[200px]">
+                    Account
+                  </th>
+                  <th className="text-right px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[150px]">
+                    Amount
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {isLoading ? (
+                  [...Array(5)].map((_, i) => (
+                    <tr key={i}>
+                      <td colSpan={5} className="px-4 py-5">
+                        <div className="h-10 bg-slate-50 rounded-xl animate-pulse" />
+                      </td>
+                    </tr>
+                  ))
+                ) : filteredTransactions.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-4 py-20 text-center text-slate-400 font-bold uppercase tracking-widest opacity-60"
+                    >
+                      No {tab} records found
                     </td>
                   </tr>
-                ))
-              ) : filteredTransactions.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-20 text-center text-slate-400 font-bold uppercase tracking-widest opacity-60"
-                  >
-                    No {tab} records found
-                  </td>
-                </tr>
-              ) : (
-                filteredTransactions.map((t: any) => (
-                  <tr
-                    key={t.id}
-                    className="hover:bg-slate-50/50 transition-colors group"
-                  >
-                    <td className="px-4 py-5">
-                      <div className="flex items-center gap-3">
-                        <div
+                ) : (
+                  filteredTransactions.map((t: any) => (
+                    <tr
+                      key={t.id}
+                      className="hover:bg-slate-50/50 transition-colors group"
+                    >
+                      <td className="px-4 py-5 w-[180px]">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={clsx(
+                              "w-10 h-10 rounded-xl flex items-center justify-center transition-all flex-shrink-0",
+                              tab === "income"
+                                ? "bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white"
+                                : "bg-red-50 text-red-600 group-hover:bg-red-600 group-hover:text-white",
+                            )}
+                          >
+                            {tab === "income" ? (
+                              <ArrowDownLeft className="w-5 h-5" />
+                            ) : (
+                              <ArrowUpRight className="w-5 h-5" />
+                            )}
+                          </div>
+                          <p className="font-bold text-slate-900 text-xs">
+                            {new Date(t.date).toLocaleDateString("en-PK", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-5 w-[140px]">
+                        <span
                           className={clsx(
-                            "w-10 h-10 rounded-xl flex items-center justify-center transition-all flex-shrink-0",
+                            "text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter",
                             tab === "income"
-                              ? "bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white"
-                              : "bg-red-50 text-red-600 group-hover:bg-red-600 group-hover:text-white",
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700",
                           )}
                         >
-                          {tab === "income" ? (
-                            <ArrowDownLeft className="w-5 h-5" />
-                          ) : (
-                            <ArrowUpRight className="w-5 h-5" />
+                          {t.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-5 max-w-[200px]">
+                        <p className="text-slate-600 text-xs font-medium italic truncate">
+                          {t.notes || "—"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-5 w-[200px]">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Wallet className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="font-bold text-slate-700 text-xs">
+                              {t.account?.label || "Cash"}
+                              {t.account?.accountNumber && (
+                                <span className="text-slate-400 font-normal ml-1">
+                                  ({t.account.accountNumber})
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          {(t.senderName || t.receiverName) && (
+                            <p className="text-[10px] text-slate-500 font-medium mt-0.5 ml-5">
+                              {tab === "income" 
+                                ? (t.accountId ? t.senderName : t.receiverName)
+                                : (t.accountId ? t.receiverName : t.senderName)
+                              }
+                            </p>
                           )}
                         </div>
-                        <p className="font-bold text-slate-900 text-xs">
-                          {new Date(t.date).toLocaleDateString("en-PK", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-5">
-                      <span
+                      </td>
+                      <td
                         className={clsx(
-                          "text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter",
-                          tab === "income"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700",
+                          "px-4 py-5 text-right font-black text-lg tracking-tight w-[150px]",
+                          tab === "income" ? "text-green-600" : "text-red-600",
                         )}
                       >
-                        {t.category}
-                      </span>
-                    </td>
-                    <td className="px-4 py-5 max-w-[200px]">
-                      <p className="text-slate-600 text-xs font-medium italic truncate">
-                        {t.notes || "—"}
-                      </p>
-                    </td>
-                    <td className="px-4 py-5">
-                      <div className="flex items-center gap-2">
-                        <Wallet className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="font-bold text-slate-700 text-xs">
-                          {t.account?.label || "Cash (Undeposited)"}
-                        </span>
-                      </div>
-                    </td>
-                    <td
-                      className={clsx(
-                        "px-4 py-5 text-right font-black text-lg tracking-tight",
-                        tab === "income" ? "text-green-600" : "text-red-600",
-                      )}
-                    >
-                      PKR {Number(t.amount).toLocaleString()}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
+                        PKR {Number(t.amount).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
             </table>
           </div>
         </div>
@@ -503,7 +520,9 @@ function AddTransactionModal({
 }) {
   const qc = useQueryClient();
   const categories =
-    type === "expense" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES.filter(c => c !== "Student Fees");
+    type === "expense"
+      ? EXPENSE_CATEGORIES
+      : INCOME_CATEGORIES.filter((c) => c !== "Student Fees");
   const [form, setForm] = useState({
     category: "",
     amount: "",
@@ -523,7 +542,7 @@ function AddTransactionModal({
     mutationFn: financeApi.create,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["other-finance"] });
-      qc.invalidateQueries({ queryKey: ["finance-categories"] });
+      qc.invalidateQueries({ queryKey: ["other-finance-all"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
       toast.success(type === "income" ? "Income recorded" : "Expense recorded");
       onClose();
@@ -647,7 +666,8 @@ function AddTransactionModal({
             onChange={(e) =>
               setForm((f) => ({
                 ...f,
-                [type === "income" ? "senderName" : "receiverName"]: e.target.value,
+                [type === "income" ? "senderName" : "receiverName"]:
+                  e.target.value,
               }))
             }
           />

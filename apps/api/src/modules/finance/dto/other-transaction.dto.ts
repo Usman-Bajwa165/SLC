@@ -27,6 +27,14 @@ export class CreateOtherTransactionDto {
   @IsOptional()
   @IsDateString()
   date?: string;
+
+  @IsOptional()
+  @IsString()
+  senderName?: string;
+
+  @IsOptional()
+  @IsString()
+  receiverName?: string;
 }
 
 export class OtherTransactionQueryDto {

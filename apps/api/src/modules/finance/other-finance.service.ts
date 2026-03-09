@@ -21,6 +21,8 @@ export class OtherFinanceService {
           accountId: dto.accountId,
           notes: dto.notes,
           date: dto.date ? new Date(dto.date) : new Date(),
+          senderName: dto.senderName,
+          receiverName: dto.receiverName,
         },
       });
 
@@ -60,7 +62,7 @@ export class OtherFinanceService {
         skip,
         take,
         include: {
-          account: { select: { id: true, label: true } },
+          account: { select: { id: true, label: true, accountNumber: true } },
         },
         orderBy: { date: "desc" },
       }),

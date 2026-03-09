@@ -29,6 +29,14 @@ export class CreatePaymentDto {
   @IsOptional()
   notes?: string;
 
+  @IsString()
+  @IsOptional()
+  senderName?: string;
+
+  @IsString()
+  @IsOptional()
+  receiverName?: string;
+
   // Optional manual allocation overrides (skip for FIFO default)
   @IsArray()
   @IsOptional()

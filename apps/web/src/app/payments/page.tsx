@@ -76,7 +76,10 @@ export default function PaymentsPage() {
       </div>
 
       {tab === "history" ? (
-        <TransactionHistory search={searchHistory} setSearch={setSearchHistory} />
+        <TransactionHistory
+          search={searchHistory}
+          setSearch={setSearchHistory}
+        />
       ) : (
         <StudentPortal search={searchPortal} setSearch={setSearchPortal} />
       )}
@@ -94,11 +97,12 @@ function TransactionHistory({ search, setSearch }: any) {
     const allPayments = paymentsRes?.data || [];
     if (!search) return allPayments;
     const searchLower = search.toLowerCase();
-    return allPayments.filter((p: any) => 
-      p.student?.name?.toLowerCase().includes(searchLower) ||
-      p.student?.rollNo?.toLowerCase().includes(searchLower) ||
-      p.student?.registrationNo?.toLowerCase().includes(searchLower) ||
-      p.receiptNo?.toLowerCase().includes(searchLower)
+    return allPayments.filter(
+      (p: any) =>
+        p.student?.name?.toLowerCase().includes(searchLower) ||
+        p.student?.rollNo?.toLowerCase().includes(searchLower) ||
+        p.student?.registrationNo?.toLowerCase().includes(searchLower) ||
+        p.receiptNo?.toLowerCase().includes(searchLower),
     );
   }, [paymentsRes?.data, search]);
 
@@ -145,16 +149,16 @@ function TransactionHistory({ search, setSearch }: any) {
         </div>
       </div>
 
-      <div className="card-premium overflow-hidden border-slate-100 shadow-2xl shadow-slate-200/50">
-        <div className="overflow-x-auto">
+      <div className="card-premium overflow-hidden border-slate-100 shadow-2xl shadow-slate-200/50 flex flex-col h-[calc(145vh-600px)]">
+        <div className="overflow-x-auto overflow-y-auto flex-1">
           <table className="w-full text-left border-collapse">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="bg-slate-50/50">
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                   Receipt
                 </th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                  Student / Payer
+                  Student
                 </th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                   Reg / Roll
@@ -170,9 +174,6 @@ function TransactionHistory({ search, setSearch }: any) {
                 </th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                   Account
-                </th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">
-                  Actions
                 </th>
               </tr>
             </thead>
@@ -192,6 +193,11 @@ function TransactionHistory({ search, setSearch }: any) {
                       <p className="text-xs font-black text-slate-800 uppercase tracking-tight">
                         {p.student?.name || "Manual Deposit"}
                       </p>
+                      {p.student?.cnic && (
+                        <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                          {p.student.cnic}
+                        </p>
+                      )}
                       {p.senderName && (
                         <p className="text-[9px] font-bold text-slate-400 mt-0.5">
                           From: {p.senderName}
@@ -203,7 +209,7 @@ function TransactionHistory({ search, setSearch }: any) {
                         {p.student?.registrationNo || "—"}
                       </p>
                       <p className="text-[10px] font-bold text-slate-400 mt-0.5">
-                        {p.student?.rollNo || "—"}
+                        {p.student?.rollNo ? p.student.rollNo : "—"}
                       </p>
                     </td>
                     <td className="px-6 py-5 text-[10px] font-bold text-slate-500">
@@ -220,28 +226,22 @@ function TransactionHistory({ search, setSearch }: any) {
                         PKR {Number(p.amount).toLocaleString()}
                       </p>
                     </td>
-                    <td className="px-6 py-5 text-[10px] font-bold text-slate-400 uppercase truncate max-w-[120px]">
-                      {p.account?.label || "—"}
-                    </td>
-                    <td className="px-6 py-5 text-right space-x-1">
-                      <button
-                        className="p-2 text-slate-400 hover:text-brand-blue hover:bg-brand-blue/5 rounded-lg transition-all"
-                        title="View Receipt"
-                      >
-                        <FileText className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
-                        title="Print"
-                      >
-                        <Printer className="w-4 h-4" />
-                      </button>
+                    <td className="px-6 py-5">
+                      <p className="text-[10px] font-bold text-slate-700 uppercase">
+                        {p.account?.label || "Cash"}
+                        {p.account?.accountNumber && ` - ${p.account.accountNumber}`}
+                      </p>
+                      {(p.senderName || p.receiverName) && (
+                        <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                          {p.senderName || p.receiverName}
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="px-6 py-20 text-center">
+                  <td colSpan={7} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center opacity-30">
                       <CreditCard className="w-16 h-16 mb-4 text-slate-300" />
                       <p className="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">
@@ -264,9 +264,9 @@ function StudentPortal({ search, setSearch }: any) {
   const studentIdParam = searchParams.get("studentId");
   const returnUrlParam = searchParams.get("returnUrl");
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(
-    studentIdParam ? Number(studentIdParam) : null
+    studentIdParam ? Number(studentIdParam) : null,
   );
-  
+
   const { data: studentsRes, isLoading } = useQuery({
     queryKey: ["students-portal"],
     queryFn: () => studentsApi.list({ limit: 50 }),
@@ -276,10 +276,11 @@ function StudentPortal({ search, setSearch }: any) {
     const allStudents = studentsRes?.data || [];
     if (!search) return allStudents;
     const searchLower = search.toLowerCase();
-    return allStudents.filter((s: any) => 
-      s.name?.toLowerCase().includes(searchLower) ||
-      s.rollNo?.toLowerCase().includes(searchLower) ||
-      s.registrationNo?.toLowerCase().includes(searchLower)
+    return allStudents.filter(
+      (s: any) =>
+        s.name?.toLowerCase().includes(searchLower) ||
+        s.rollNo?.toLowerCase().includes(searchLower) ||
+        s.registrationNo?.toLowerCase().includes(searchLower),
     );
   }, [studentsRes?.data, search]);
 

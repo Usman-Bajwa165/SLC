@@ -155,6 +155,11 @@ export class UpdateStudentDto {
   @IsOptional()
   status?: string;
 
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  currentSemester?: number;
+
   @IsNumber()
   @Min(0)
   @Max(4)

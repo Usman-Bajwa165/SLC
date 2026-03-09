@@ -243,7 +243,10 @@ export class ReportsService {
     const [payments, otherItems] = await Promise.all([
       this.prisma.payment.findMany({
         where: { accountId },
-        include: { student: { select: { name: true } }, method: true },
+        include: {
+          student: { select: { name: true, registrationNo: true } },
+          method: true,
+        },
         orderBy: { date: "desc" },
       }),
       (this.prisma as any).otherTransaction.findMany({
@@ -258,7 +261,7 @@ export class ReportsService {
         date: p.date,
         type: "credit",
         category: "Student Fee",
-        description: `Payment from ${p.student?.name || "Unknown Student"}`,
+        description: `Payment from ${p.student?.name || "Unknown Student"} - ${(p.student as any)?.registrationNo || "N/A"}`,
         amount: p.amount,
         reference: p.receiptNo,
         senderName: p.senderName,

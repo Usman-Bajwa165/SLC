@@ -250,10 +250,12 @@ export class StudentsService {
             methodId: paymentMethodId,
             accountId: accountId || null,
             receiptNo,
+            senderName: senderName || null,
+            receiverName: receiverName || null,
             notes: senderName
-              ? `Sender: ${senderName}`
+              ? `Sender: ${senderName} | Enrollment Advance`
               : receiverName
-                ? `Receiver: ${receiverName}`
+                ? `Receiver: ${receiverName} | Enrollment Advance`
                 : "Enrollment Advance",
           },
         });
@@ -303,15 +305,53 @@ export class StudentsService {
       senderName,
       receiverName,
       paymentDate,
+      currentSemester,
       ...updateData
     } = dto;
 
     const advancePaid = _adv ? new Decimal(_adv) : new Decimal(0);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Handle semester/year change
+      if (currentSemester !== undefined && currentSemester !== existing.currentSemester) {
+        const activeFinance = await tx.studentFinance.findFirst({
+          where: { studentId: id, isSnapshot: false },
+          orderBy: { createdAt: "desc" },
+        });
+
+        if (activeFinance) {
+          const oldTerm = existing.currentSemester || 0;
+          const newTerm = currentSemester;
+          const currentFeeDue = new Decimal(activeFinance.feeDue.toString());
+          const currentPaid = new Decimal(activeFinance.feePaid.toString());
+          const currentCarryOver = new Decimal(activeFinance.carryOver.toString());
+          const currentRemaining = new Decimal(activeFinance.remaining.toString());
+
+          if (newTerm > oldTerm) {
+            // Promoted forward - keep fee, add remaining to carryover
+            await tx.studentFinance.update({
+              where: { id: activeFinance.id },
+              data: {
+                carryOver: currentCarryOver.plus(currentRemaining),
+                remaining: currentFeeDue.plus(currentCarryOver).plus(currentRemaining).minus(currentPaid),
+              },
+            });
+          } else {
+            // Demoted backward - keep fee, subtract one term fee from remaining
+            const newRemaining = currentRemaining.minus(currentFeeDue);
+            await tx.studentFinance.update({
+              where: { id: activeFinance.id },
+              data: {
+                remaining: newRemaining.greaterThan(0) ? newRemaining : new Decimal(0),
+              },
+            });
+          }
+        }
+      }
+
       const updated = await tx.student.update({
         where: { id },
-        data: { ...updateData, version: { increment: 1 } },
+        data: { ...updateData, currentSemester, version: { increment: 1 } },
       });
 
       // Find the active student finance
@@ -364,10 +404,12 @@ export class StudentsService {
             methodId: paymentMethodId,
             accountId: accountId || null,
             receiptNo,
+            senderName: senderName || null,
+            receiverName: receiverName || null,
             notes: senderName
-              ? `Sender: ${senderName}`
+              ? `Sender: ${senderName} | Payment from Profile Update`
               : receiverName
-                ? `Receiver: ${receiverName}`
+                ? `Receiver: ${receiverName} | Payment from Profile Update`
                 : "Payment from Profile Update",
           },
         });

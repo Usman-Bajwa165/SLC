@@ -386,7 +386,7 @@ function OutstandingReport() {
           color="blue"
         />
         <SummaryCard
-          label="Total Payable"
+          label="Total Fee Receivable"
           value={`PKR ${formatCurrency(data?.grandTotalPayable || 0)}`}
           icon={<BookOpen className="w-5 h-5" />}
           color="indigo"

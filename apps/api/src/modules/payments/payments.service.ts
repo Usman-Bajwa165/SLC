@@ -62,9 +62,9 @@ export class PaymentsService {
         skip,
         take,
         include: {
-          student: { select: { id: true, name: true, registrationNo: true } },
+          student: { select: { id: true, name: true, registrationNo: true, rollNo: true, cnic: true } },
           method: { select: { id: true, name: true, type: true } },
-          account: { select: { id: true, label: true } },
+          account: { select: { id: true, label: true, accountNumber: true } },
           allocations: true,
         },
         orderBy: { date: "desc" },
@@ -132,6 +132,8 @@ export class PaymentsService {
           accountId: dto.accountId,
           receiptNo,
           notes: dto.notes,
+          senderName: dto.senderName,
+          receiverName: dto.receiverName,
         },
       });
 

@@ -263,6 +263,7 @@ export default function EnrollmentPage() {
         delete payload.paymentMethodId;
         delete payload.receiptNo;
         delete payload.senderName;
+        delete payload.receiverName;
         delete payload.accountId;
         delete payload.paymentDate;
       } else {
@@ -277,6 +278,15 @@ export default function EnrollmentPage() {
             const err = `Payment method '${methodType}' not found. Please refresh.`;
             toast.error(err);
             throw new Error(err);
+          }
+        }
+        // Clean up sender/receiver based on payment method
+        if (payload.paymentMethodId) {
+          const method = paymentMethods?.find((m: any) => m.id === payload.paymentMethodId);
+          if (method?.type === 'cash') {
+            delete payload.senderName;
+          } else {
+            delete payload.receiverName;
           }
         }
       }
@@ -295,6 +305,10 @@ export default function EnrollmentPage() {
     onSuccess: (data) => {
       console.log("Enrollment successful:", data);
       queryClient.invalidateQueries({ queryKey: ["students"] });
+      queryClient.invalidateQueries({ queryKey: ["students-search"] });
+      if (selectedExistingId) {
+        queryClient.invalidateQueries({ queryKey: ["student-direct", selectedExistingId.toString()] });
+      }
       toast.success(
         mode === "new"
           ? "Student enrolled successfully!"

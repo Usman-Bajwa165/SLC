@@ -182,6 +182,7 @@ model Payment {
   accountId     Int?
   receiptNo     String        @unique
   senderName    String?       // For Bank/Online transfers
+  receiverName  String?       // For Cash payments
   notes         String?
   receiptPath   String?       // MinIO path to PDF receipt
   allocations   PaymentAllocation[]
