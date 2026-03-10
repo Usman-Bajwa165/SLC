@@ -330,3 +330,20 @@ model StaffSalaryHistory {
   @@unique([staffId, effectiveMonth])
   @@map("staff_salary_history")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WHATSAPP SETTINGS
+// Singleton configuration for WhatsApp integration and automated notifications.
+// ─────────────────────────────────────────────────────────────────────────────
+model WhatsappSettings {
+  id                    Int      @id @default(1)
+  toNumber              String   @default("92 ") // Target number to receive notifications
+  notifyStudentPayments Boolean  @default(true)
+  notifyStaffPayments   Boolean  @default(true)
+  notifyFinance         Boolean  @default(true)
+  notifyAccounts        Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("whatsapp_settings")
+}
