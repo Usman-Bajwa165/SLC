@@ -1,322 +1,79 @@
-# Stars Law College — Finance & Student Management System
+# Stars Law College — Management System
 
-A professional-grade full-stack web application for managing student admissions, academic progression, fee collection, and financial reporting.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Backend API | NestJS + TypeScript |
-| ORM | Prisma |
-| Database | PostgreSQL 15 |
-| Frontend | Next.js 14 + Tailwind CSS |
-| Queue / Cache | Redis + BullMQ |
-| File Storage | MinIO (S3-compatible) |
-| Containers | Docker + Docker Compose |
-| CI/CD | GitHub Actions |
+Welcome to the **Stars Law College Management System**. This is a premium, enterprise-grade application designed for the administration of students, staff, finances, and automated WhatsApp communications.
 
 ---
 
-## Quick Start (Docker — Recommended)
+## 🚀 Minimum System Requirements
 
-```bash
-# 1. Clone and enter the repo
-git clone <your-repo-url> slc-system
-cd slc-system
+Before setting up the system, ensure your master computer has the following software installed. These only need to be installed **once**.
 
-# 2. Copy environment config
-cp .env.example .env
+### Windows & macOS
 
-# 3. Start all services
-docker compose up -d
-
-# 4. Run database migrations
-docker compose exec api npx prisma migrate deploy
-
-# 5. Seed sample data (optional)
-docker compose exec api npm run db:seed
-```
-
-Services will be available at:
-- **Frontend**: http://localhost:3000
-- **API**: http://localhost:3001/api/v1
-- **MinIO Console**: http://localhost:9001 (user: slc_minio_access / slc_minio_secret)
+- **[Node.js](https://nodejs.org/)** (v18 or v20 LTS) — Required to run the application engine.
+- **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** — Required for the database and background job services. Ensure Docker Desktop is **running** in your system tray before starting the application.
+- **[PostgreSQL CLI (`pg_dump`)](https://www.postgresql.org/download/)** — Recommended for the automated nightly SQL backup engine to function correctly.
 
 ---
 
-## Local Development (Without Docker)
+## 🛠️ First-Time Setup Instructions
 
-### Prerequisites
-- Node.js 20+
-- PostgreSQL 15+
-- Redis 7+
-- MinIO (or use Docker for infrastructure only)
+You only need to run the setup script the very first time you download the application to your machine.
 
-### Setup
+### For Windows Users
 
-```bash
-# Install dependencies (root — installs all workspaces)
-npm install
+1. Open the `slc` folder in your File Explorer.
+2. Navigate to the `scripts/windows/` folder.
+3. Double-click the file named **`setup.bat`**.
+4. A terminal window will open and automatically download all necessary packages, synchronize the database, and prepare the engine. Allow it to finish completely.
 
-# Set up environment
-cp .env.example .env
+### For Mac Users
 
-# Generate Prisma client
-cd apps/api
-npx prisma generate
-
-# Apply Prisma schema to database
-npx prisma migrate dev --name init
-
-# Seed development data
-npm run db:seed
-cd ../..
-
-# Start API + Frontend together
-npm run dev
-```
+1. Open the `slc` folder in Finder.
+2. Navigate to the `scripts/mac/` folder.
+3. Wait, make sure the script has execution permissions. Open your Terminal and run: `chmod +x scripts/mac/setup.command && chmod +x scripts/mac/start.command`.
+4. Double-click the file named **`setup.command`**.
+5. Allow the terminal to download all necessary packages and synchronize the database.
 
 ---
 
-## Hybrid Development (Docker Infrastructure + Local Code)
+## 🖥️ Daily Usage & Launching the App
 
-**Recommended for most developers** — Use Docker for databases, run code locally for hot-reload.
+You do not need to use code editors or command lines to run your app daily. We have provided simple one-click launcher scripts.
 
-```bash
-# 1. Install dependencies
-npm install
+### Creating a Desktop Icon (Windows)
 
-# 2. Copy environment config (IMPORTANT: Only edit the root .env file)
-cp .env.example .env
+1. Go to `scripts/windows/` inside your `slc` folder.
+2. Right-click on **`start.bat`** and select **"Send to -> Desktop (create shortcut)"**.
+3. Now, you have a shortcut on your desktop! You can rename it to **"Start SLC System"**.
+4. _(Optional)_ Right-click the new shortcut on your desktop -> Properties -> Change Icon -> Select a nice icon.
 
-# 3. Start infrastructure only (PostgreSQL, Redis, MinIO)
-npm run dev:infra
+### Creating a Desktop Icon (Mac)
 
-# 4. Wait 5 seconds for DB to be ready, then push schema
-cd apps/api
-npx prisma db push --schema=../../prisma/schema.prisma
+Macs _do_ have a Desktop, but the main "homescreen" where all apps live is called the **Launchpad** (which shows the contents of your **Applications** folder), and the pinned bar at the bottom of the screen is called the **Dock**.
 
-# 5. Seed data
-npx tsx ../../prisma/seed.ts
-cd ../..
+To create a proper Mac App icon:
 
-# 6. Start API + Frontend (auto-syncs .env files)
-npm run dev
+1. Go to `scripts/mac/` inside your `slc` folder.
+2. Ensure you have given it permissions: `chmod +x install-mac-app.command`
+3. Double-click **`install-mac-app.command`**.
+4. This will permanently generate a "Start SLC System" application directly into your Mac's **Applications** folder.
+5. You can now press `Cmd + Space` (Spotlight) or open your **Launchpad** to find "Start SLC System" and drag it down to your **Dock** for 1-click access!
 
-# When done, stop infrastructure
-npm run stop:infra
-```
+### Starting the System
 
-**Services:**
-- Frontend: http://localhost:3000 (hot-reload)
-- API: http://localhost:3001/api/v1 (hot-reload)
-- PostgreSQL: localhost:5432
-- Redis: localhost:6379
-- MinIO Console: http://localhost:9001
-
-**Important Notes:**
-- Only edit `.env` in the root `/slc` directory
-- The `npm run dev` command automatically syncs `.env` to `apps/api/.env` and `apps/web/.env.local`
-- If you manually edit `.env`, run `npm run sync:env` to update subdirectories
+1. **Ensure Docker Desktop is open and running in the background.**
+2. Double-click your newly created Desktop Shortcut (`Start SLC System`).
+3. A terminal will open to boot up the database, WhatsApp connection, and web server. **Do not close this black window while you are using the app.** You can minimize it.
+4. Your default web browser will automatically open and navigate to the application (`http://localhost:3000`).
 
 ---
 
-## Project Structure
+## 🛑 Shutting Down
 
-```
-slc-system/
-├── apps/
-│   ├── api/                   # NestJS Backend
-│   │   ├── src/
-│   │   │   ├── common/
-│   │   │   │   ├── filters/   # Global exception filter
-│   │   │   │   ├── interceptors/
-│   │   │   │   ├── pagination/
-│   │   │   │   ├── prisma/    # Prisma service + module
-│   │   │   │   ├── storage/   # MinIO service
-│   │   │   │   ├── tests/     # Unit tests
-│   │   │   │   └── workers/   # BullMQ processors
-│   │   │   ├── config/
-│   │   │   ├── modules/
-│   │   │   │   ├── departments/
-│   │   │   │   ├── sessions/
-│   │   │   │   ├── students/
-│   │   │   │   ├── finance/   # Ledger + FIFO allocation
-│   │   │   │   ├── payments/
-│   │   │   │   ├── accounts/
-│   │   │   │   ├── reports/
-│   │   │   │   ├── import-export/
-│   │   │   │   └── audit/
-│   │   │   ├── app.module.ts
-│   │   │   ├── main.ts
-│   │   │   └── worker.ts     # Background worker entrypoint
-│   │   ├── prisma/
-│   │   │   └── seed.ts
-│   │   ├── Dockerfile
-│   │   └── Dockerfile.worker
-│   └── web/                   # Next.js Frontend
-│       └── src/
-│           ├── app/           # Next.js App Router pages
-│           ├── components/
-│           │   ├── layout/    # Sidebar, TopBar
-│           │   └── ...
-│           └── lib/
-│               └── api/       # Typed API client
-├── prisma/
-│   └── schema.prisma          # Complete data model
-├── scripts/
-│   └── init-db.sql            # PostgreSQL receipt sequence
-├── .github/
-│   └── workflows/ci.yml       # GitHub Actions CI/CD
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
+When you are finished using the application for the day:
 
----
+1. Open the black Terminal window that was running the application.
+2. Press `Ctrl + C` on your keyboard. It will ask "Terminate batch job? (Y/N)". Type `Y` and hit enter to safely shut down the web server.
 
-## API Reference
-
-Base URL: `http://localhost:3001/api/v1`
-
-All responses wrapped in `{ data: ..., meta?: ... }`.  
-All errors return `{ statusCode, message, errors[], path, timestamp }`.
-
-### Departments
-```
-GET    /departments
-POST   /departments
-GET    /departments/:id
-PUT    /departments/:id
-DELETE /departments/:id
-GET    /departments/:id/fee-structures
-POST   /departments/fee-structures
-GET    /departments/:id/migration-preview
-```
-
-### Sessions
-```
-GET    /departments/:deptId/sessions
-POST   /departments/:deptId/sessions
-PUT    /sessions/:id
-DELETE /sessions/:id
-```
-
-### Students
-```
-GET    /students?q=&department=&session=&status=&page=&limit=
-POST   /students
-GET    /students/:id
-PUT    /students/:id
-DELETE /students/:id
-GET    /students/:id/finance
-POST   /students/:id/finance
-POST   /students/:id/promote
-```
-
-### Payments
-```
-GET    /payments?studentId=&accountId=&methodId=&dateFrom=&dateTo=
-POST   /payments
-GET    /payments/:id
-GET    /payments/:id/receipt
-```
-
-### Accounts
-```
-GET    /payment-methods
-POST   /payment-methods
-GET    /accounts
-POST   /accounts
-PUT    /accounts/:id
-GET    /accounts/:id/ledger?from=&to=
-```
-
-### Reports
-```
-GET    /reports/dashboard
-GET    /reports/outstanding?department=&session=
-GET    /reports/outstanding/export   (CSV download)
-GET    /reports/daily-receipts?date=
-GET    /reports/daily-receipts/export?date=
-GET    /reports/student-ledger?studentId=
-GET    /reports/advance-summary?department=
-```
-
-### Import / Export
-```
-POST   /import/students?dryRun=true|false   (multipart file upload)
-POST   /import/payments?dryRun=true|false
-GET    /export/students?department=
-GET    /export/payments?from=&to=
-GET    /templates/students
-GET    /templates/payments
-```
-
----
-
-## Running Tests
-
-```bash
-cd apps/api
-
-# All tests
-npm test
-
-# With coverage
-npm run test:cov
-
-# Watch mode
-npm run test:watch
-```
-
----
-
-## Database Management
-
-```bash
-cd apps/api
-
-# Create a new migration
-npx prisma migrate dev --name <migration-name>
-
-# Apply migrations in production
-npx prisma migrate deploy
-
-# Open Prisma Studio (GUI)
-npm run db:studio
-
-# Reset + reseed (development only)
-npx prisma migrate reset
-npm run db:seed
-```
-
----
-
-## Environment Variables
-
-| Variable | Description | Default |
-|---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | — |
-| `REDIS_URL` | Redis connection string | — |
-| `MINIO_ENDPOINT` | MinIO host | localhost |
-| `MINIO_PORT` | MinIO port | 9000 |
-| `MINIO_ACCESS_KEY` | MinIO access key | — |
-| `MINIO_SECRET_KEY` | MinIO secret key | — |
-| `RECEIPT_PREFIX` | Receipt number prefix | SLC |
-| `CURRENCY_SYMBOL` | Display currency | PKR |
-| `NEXT_PUBLIC_API_URL` | Frontend API URL | http://localhost:3001/api/v1 |
-
----
-
-## Business Rules Summary
-
-- **Finance formula**: `remaining = feeDue - feePaid - advanceTaken`
-- **Payment allocation**: FIFO by default (oldest outstanding term first); manual override supported
-- **Promotion**: validates `currentSemester + 1 ≤ totalSemesters`; snapshots existing finance records; carries forward unpaid balance into new term; resets advance to 0
-- **Receipt numbers**: format `SLC-YYYY-XXXXX`; generated from PostgreSQL sequence (atomic, race-condition-safe)
-- **CNIC**: stored as 13 digits only (dashes stripped on input)
-- **Immutable ledger**: finance records are never mutated after creation; promotions create new records
-- **Audit log**: all create/update/delete/promote/payment/import operations logged with before/after snapshots
+> **Note:** Unless you shut down your computer, the Docker database will remain running in the background seamlessly.

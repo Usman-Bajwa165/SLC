@@ -312,9 +312,9 @@ export default function StudentLedgerPage() {
                             <p className="text-sm font-black text-green-600">
                               + PKR {formatCurrency(log.amount)}
                             </p>
-                            {log.notes && (
-                              <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5 truncate max-w-[150px] ml-auto">
-                                {log.notes}
+                            {(log.senderName || log.payerName) && (
+                              <p className="text-[9px] font-bold text-brand-blue uppercase mt-0.5 truncate max-w-[150px] ml-auto">
+                                By: {log.senderName || log.payerName}
                               </p>
                             )}
                           </td>

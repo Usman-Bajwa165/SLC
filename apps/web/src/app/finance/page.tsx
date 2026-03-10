@@ -69,6 +69,12 @@ export default function FinancePage() {
     enabled: tab === "income",
   });
 
+  const { data: staffPaymentsRes } = useQuery({
+    queryKey: ["staff-payments-finance"],
+    queryFn: () => paymentsApi.list({ source: "staff", limit: 1000 }),
+    enabled: tab === "expense",
+  });
+
   const allTxns = allTransactions?.items || [];
   const studentFees =
     tab === "income"
@@ -85,7 +91,22 @@ export default function FinancePage() {
         }))
       : [];
 
-  const allRecords = [...allTxns, ...studentFees].sort(
+  const staffPayments =
+    tab === "expense"
+      ? (staffPaymentsRes?.data || []).map((p: any) => ({
+          id: `staff-${p.id}`,
+          category: "Salary",
+          date: p.date,
+          notes: `${(p.type || "").toUpperCase()} paid to ${p.staff?.name || "Staff"} - ${p.month || "N/A"}`,
+          amount: p.amount,
+          accountId: p.accountId,
+          account: p.account,
+          senderName: p.payerName || p.senderName,
+          receiverName: p.staff?.name,
+        }))
+      : [];
+
+  const allRecords = [...allTxns, ...studentFees, ...staffPayments].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
 
@@ -142,7 +163,7 @@ export default function FinancePage() {
 
   const dCategories =
     tab === "expense"
-      ? EXPENSE_CATEGORIES
+      ? [...EXPENSE_CATEGORIES, "Salary"]
       : [...INCOME_CATEGORIES, "Student Fees"];
 
   return (

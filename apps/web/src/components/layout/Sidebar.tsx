@@ -15,6 +15,8 @@ import {
   UserPlus,
   Wallet,
   Briefcase,
+  Smartphone,
+  HardDriveDownload,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useState } from "react";
@@ -29,7 +31,8 @@ const nav = [
   { href: "/accounts", label: "Accounts", icon: Landmark },
   { href: "/finance", label: "Finance", icon: Wallet },
   { href: "/reports", label: "Reports", icon: BarChart3 },
-  { href: "/import-export", label: "Import / Export", icon: Upload },
+  { href: "/backups", label: "Backups", icon: HardDriveDownload },
+  { href: "/whatsapp", label: "WhatsApp", icon: Smartphone },
 ];
 
 export default function Sidebar() {

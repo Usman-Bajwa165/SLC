@@ -133,6 +133,7 @@ export default function PaymentsPage() {
 
 function TransactionHistory({ search, setSearch }: any) {
   const [source, setSource] = useState("all");
+  const [staffType, setStaffType] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -147,7 +148,12 @@ function TransactionHistory({ search, setSearch }: any) {
   });
 
   const payments = useMemo(() => {
-    const allPayments = paymentsRes?.data || [];
+    let allPayments = paymentsRes?.data || [];
+    
+    if (source === "staff" && staffType !== "all") {
+      allPayments = allPayments.filter((p: any) => p.type?.toLowerCase() === staffType);
+    }
+
     if (!search) return allPayments;
     const searchLower = search.toLowerCase();
     return allPayments.filter(
@@ -234,6 +240,31 @@ function TransactionHistory({ search, setSearch }: any) {
             ))}
           </div>
         </div>
+        
+        {source === "staff" && (
+          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-sm ml-0 lg:ml-auto w-fit">
+            {[
+              { id: "all", label: "All Types" },
+              { id: "salary", label: "Salary" },
+              { id: "advance", label: "Advance" },
+              { id: "loan", label: "Loan" },
+            ].map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setStaffType(s.id)}
+                className={clsx(
+                  "px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  staffType === s.id
+                    ? "bg-white text-green-600 shadow-sm"
+                    : "text-slate-400 hover:text-slate-600",
+                )}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex gap-2">
           <button
             className="btn-secondary flex items-center gap-2 group px-6"

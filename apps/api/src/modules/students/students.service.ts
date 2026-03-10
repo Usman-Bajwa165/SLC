@@ -8,6 +8,7 @@ import { Decimal } from "decimal.js";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { DepartmentsService } from "../departments/departments.service";
+import { WhatsappService } from "../whatsapp/whatsapp.service";
 import {
   CreateStudentDto,
   UpdateStudentDto,
@@ -24,6 +25,7 @@ export class StudentsService {
     private prisma: PrismaService,
     private audit: AuditService,
     private departments: DepartmentsService,
+    private whatsapp: WhatsappService,
   ) {}
 
   async findAll(query: StudentQueryDto) {
@@ -282,6 +284,13 @@ export class StudentsService {
     });
 
     await this.audit.log("student", result.id, "create", null, result);
+    
+    // Send enrollment notification
+    await this.whatsapp.sendSystemNotification(
+      'enrollment',
+      `📚 *NEW STUDENT ENROLLED*\n\nName: ${result.name}\nReg No: ${result.registrationNo}\nDepartment: ${dept.name}\nProgram: ${dto.programMode}\nFee Due: PKR ${feeDue.toString()}\nAdvance Paid: PKR ${advancePaid.toString()}\nRemaining: PKR ${remaining.toString()}`
+    );
+    
     return this.findOne(result.id);
   }
 
@@ -471,6 +480,13 @@ export class StudentsService {
       data: { isDeleted: true },
     });
     await this.audit.log("student", id, "delete", existing, null);
+    
+    // Send deactivation notification
+    await this.whatsapp.sendSystemNotification(
+      'deactivation',
+      `🚫 *STUDENT DEACTIVATED*\n\nName: ${existing.name}\nReg No: ${existing.registrationNo}\nDepartment: ${existing.department.name}\nStatus: Deactivated`
+    );
+    
     return { deleted: true };
   }
 

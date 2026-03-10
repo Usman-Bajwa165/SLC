@@ -7,6 +7,7 @@ import {
 import { Decimal } from "decimal.js";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { WhatsappService } from "../whatsapp/whatsapp.service";
 import { CreatePaymentMethodDto, CreateAccountDto } from "./dto/account.dto";
 
 @Injectable()
@@ -14,6 +15,7 @@ export class AccountsService implements OnModuleInit {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private whatsapp: WhatsappService,
   ) {}
 
   async onModuleInit() {
@@ -123,6 +125,21 @@ export class AccountsService implements OnModuleInit {
       data: updatedData,
     });
     await this.audit.log("account", id, "update", existing, updated);
+
+    // If balance was adjusted, trigger notification
+    if (dto.currentBalance !== undefined) {
+      const existingBalance = new Decimal(existing.currentBalance.toString());
+      const newBalance = new Decimal(dto.currentBalance.toString());
+      if (!newBalance.equals(existingBalance)) {
+        const dateStr = new Date().toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const typeStr = newBalance.greaterThan(existingBalance) ? 'INCREASED' : 'DECREASED';
+        const diffAbs = newBalance.minus(existingBalance).abs().toNumber().toLocaleString();
+        
+        const msg = `🏦 *ACCOUNT BALANCE ${typeStr}*\n\nAccount: ${existing.label}\nAdjusted By: Rs. ${diffAbs}\nNew Balance: Rs. ${newBalance.toNumber().toLocaleString()}\nDate: ${dateStr}`;
+        await this.whatsapp.sendSystemNotification('account', msg);
+      }
+    }
+
     return updated;
   }
 

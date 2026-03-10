@@ -4,6 +4,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import TopBar from "@/components/layout/TopBar";
 import QueryProvider from "@/components/QueryProvider";
 import TopLoader, { GlobalProgressBar } from "@/components/layout/TopLoader";
+import WhatsappGuard from "@/components/WhatsappGuard";
 import { Toaster } from "sonner";
 import { Suspense } from "react";
 
@@ -37,7 +38,7 @@ export default function RootLayout({
                 <TopBar />
               </div>
               <main className="flex-1 overflow-y-auto px-6 pb-6 pt-0 print:p-0 print:overflow-visible">
-                {children}
+                <WhatsappGuard>{children}</WhatsappGuard>
               </main>
             </div>
           </div>

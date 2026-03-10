@@ -5,14 +5,18 @@ import {
   OtherTransactionQueryDto,
 } from "./dto/other-transaction.dto";
 import { Decimal } from "decimal.js";
+import { WhatsappService } from "../whatsapp/whatsapp.service";
 import { paginate } from "../../common/pagination/pagination.helper";
 
 @Injectable()
 export class OtherFinanceService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private whatsapp: WhatsappService,
+  ) {}
 
   async create(dto: CreateOtherTransactionDto) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const transaction = await tx.otherTransaction.create({
         data: {
           type: dto.type,
@@ -41,6 +45,13 @@ export class OtherFinanceService {
 
       return transaction;
     });
+
+    const dateStr = new Date().toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const capitalizedType = dto.type === 'income' ? 'INCOME RECEIVED' : 'EXPENSE RECORDED';
+    const msg = `💰 *FINANCE: ${capitalizedType}*\n\nCategory: ${dto.category}\nAmount: Rs. ${Number(dto.amount).toLocaleString()}\nParty: ${dto.receiverName || dto.senderName || 'N/A'}\nDate: ${dateStr}`;
+    await this.whatsapp.sendSystemNotification('finance', msg);
+
+    return result;
   }
 
   async findAll(query: OtherTransactionQueryDto) {

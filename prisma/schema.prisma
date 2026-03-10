@@ -342,6 +342,8 @@ model WhatsappSettings {
   notifyStaffPayments   Boolean  @default(true)
   notifyFinance         Boolean  @default(true)
   notifyAccounts        Boolean  @default(true)
+  notifyEnrollment      Boolean  @default(true)
+  notifyDeactivation    Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

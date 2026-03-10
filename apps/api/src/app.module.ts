@@ -14,6 +14,8 @@ import { ImportExportModule } from './modules/import-export/import-export.module
 import { AuditModule } from './modules/audit/audit.module';
 import { StorageModule } from './common/storage/storage.module';
 import { StaffModule } from './modules/staff/staff.module';
+import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
+import { BackupModule } from './modules/backup/backup.module';
 import appConfig from './config/app.config';
 
 @Module({
@@ -41,6 +43,8 @@ import appConfig from './config/app.config';
     AccountsModule,
     ReportsModule,
     ImportExportModule,
+    WhatsappModule,
+    BackupModule,
   ],
 })
 export class AppModule {}

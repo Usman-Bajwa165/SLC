@@ -9,6 +9,7 @@ import { Queue } from "bull";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { FinanceService } from "../finance/finance.service";
+import { WhatsappService } from "../whatsapp/whatsapp.service";
 import { StorageService } from "../../common/storage/storage.service";
 import { CreatePaymentDto, PaymentQueryDto } from "./dto/payment.dto";
 import {
@@ -23,6 +24,7 @@ export class PaymentsService {
     private audit: AuditService,
     private finance: FinanceService,
     private storage: StorageService,
+    private whatsapp: WhatsappService,
     @InjectQueue("receipts") private receiptQueue: Queue,
   ) {}
 
@@ -285,6 +287,11 @@ export class PaymentsService {
     } catch (e) {
       // Queue unavailable — non-fatal, receipt can be regenerated
     }
+
+    // 6. WhatsApp Notification
+    const dateStr = new Date().toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const msg = `🎓 *STUDENT PAYMENT RECEIVED*\n\nStudent: ${student.name} (${student.registrationNo})\nAmount: Rs. ${amount.toLocaleString()}\nMethod: ${method.name}\nReceipt: ${receiptNo}\nDate: ${dateStr}`;
+    await this.whatsapp.sendSystemNotification('student', msg);
 
     return this.findOne(payment.id);
   }

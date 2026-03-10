@@ -1119,32 +1119,68 @@ function StaffReport() {
 
   return (
     <div className="h-full flex flex-col p-3 space-y-3 overflow-hidden">
-      <div className="flex gap-3 bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
-        <div className="flex-1 relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search staff..."
-            className="input-field !pl-12 bg-white shadow-sm border-slate-200"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="flex flex-col md:flex-row gap-3 bg-slate-50/50 p-4 rounded-3xl border border-slate-100 print:hidden">
+        <div className="flex-1 flex gap-3">
+          <div className="flex-1 relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search staff..."
+              className="input-field !pl-12 bg-white shadow-sm border-slate-200"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <select
+            className="input-field bg-white shadow-sm border-slate-200 text-xs font-bold w-48"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+          >
+            <option value="">All Roles</option>
+            <option value="principal">Principal</option>
+            <option value="president">President</option>
+            <option value="manager">Manager</option>
+            <option value="admin">Admin</option>
+            <option value="teacher">Teacher</option>
+            <option value="peon">Peon</option>
+            <option value="guard">Guard</option>
+            <option value="others">Others</option>
+          </select>
         </div>
-        <select
-          className="input-field bg-white shadow-sm border-slate-200 text-xs font-bold"
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-        >
-          <option value="">All Roles</option>
-          <option value="principal">Principal</option>
-          <option value="president">President</option>
-          <option value="manager">Manager</option>
-          <option value="admin">Admin</option>
-          <option value="teacher">Teacher</option>
-          <option value="peon">Peon</option>
-          <option value="guard">Guard</option>
-          <option value="others">Others</option>
-        </select>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              showBar();
+              exportToPDF({
+                title: "STAFF SALARY REPORT",
+                filename: "Staff_Report",
+                columns: ["Name", "CNIC", "Role", "Basic Salary", "Paid", "Remaining"],
+                data: staff.map((s: any) => {
+                  const paid = s.financeRecords?.reduce((sum: number, f: any) => sum + parseFloat(f.salaryPaid || 0), 0) || 0;
+                  const remaining = s.financeRecords?.reduce((sum: number, f: any) => sum + parseFloat(f.remaining || 0), 0) || 0;
+                  return [
+                    s.name,
+                    s.cnic,
+                    s.role,
+                    formatCurrency(s.salary),
+                    formatCurrency(paid),
+                    formatCurrency(remaining),
+                  ];
+                }),
+                summary: [
+                  { label: "Total Staff", value: String(staff.length) },
+                  { label: "Monthly Salary Base", value: `PKR ${formatCurrency(totalSalary)}` },
+                  { label: "Total Paid", value: `PKR ${formatCurrency(totalPaid)}` },
+                  { label: "Total Remaining", value: `PKR ${formatCurrency(totalRemaining)}` },
+                ],
+              });
+              setTimeout(hideBar, 500);
+            }}
+            className="bg-white border border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-2 text-[10px] px-4 py-2 hover:bg-slate-50 transition-colors shadow-sm font-black uppercase tracking-widest"
+          >
+            <FileText className="w-4 h-4" /> PDF
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

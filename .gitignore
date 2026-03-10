@@ -9,3 +9,13 @@ dist/
 coverage/
 prisma/migrations/*.sql.bak
 uploads/
+
+# WhatsApp session data
+apps/api/.wwebjs_auth/
+apps/api/.wwebjs_cache/
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Local backup files
+*.sql
+*.pdf

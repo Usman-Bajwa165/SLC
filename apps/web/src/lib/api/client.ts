@@ -161,3 +161,17 @@ export const staffApi = {
   createPayment: (dto: any) => post<any>("/staff/payments", dto),
   ledger: (id: number) => get<any>(`/staff/${id}/ledger`),
 };
+
+// ── WhatsApp ──────────────────────────────────────────────────────────────────
+export const whatsappApi = {
+  status: () => get<any>("/whatsapp/status"),
+  logout: () => post<any>("/whatsapp/logout", {}),
+  settings: () => get<any>("/whatsapp/settings"),
+  updateSettings: (dto: any) => post<any>("/whatsapp/settings", dto),
+};
+
+// ── Backups ───────────────────────────────────────────────────────────────────
+export const backupsApi = {
+  info: () => get<any>("/backups"),
+  trigger: () => post<any>("/backups/trigger", {}),
+};

@@ -6,6 +6,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { WhatsappService } from "../whatsapp/whatsapp.service";
 import {
   CreateStaffDto,
   UpdateStaffDto,
@@ -22,6 +23,7 @@ export class StaffService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private whatsapp: WhatsappService,
   ) {}
 
   private async getSalaryAt(tx: any, staffId: number, month: string) {
@@ -158,6 +160,13 @@ export class StaffService {
     });
 
     await this.audit.log("staff", result.id, "create", null, result);
+    
+    // Send enrollment notification
+    await this.whatsapp.sendSystemNotification(
+      'enrollment',
+      `👔 *NEW STAFF HIRED*\n\nName: ${result.name}\nRole: ${dto.role}\nSalary: PKR ${salary.toString()}\nJoined: ${new Date(dto.joinedDate).toLocaleDateString('en-PK')}`
+    );
+    
     return this.findOne(result.id);
   }
 
@@ -240,6 +249,13 @@ export class StaffService {
       data: { isDeleted: true },
     });
     await this.audit.log("staff", id, "delete", existing, null);
+    
+    // Send deactivation notification
+    await this.whatsapp.sendSystemNotification(
+      'deactivation',
+      `🚫 *STAFF DEACTIVATED*\n\nName: ${existing.name}\nRole: ${existing.role}\nStatus: Deactivated`
+    );
+    
     return { deleted: true };
   }
 
@@ -335,6 +351,14 @@ export class StaffService {
     });
 
     await this.audit.log("staff", dto.staffId, "payment", null, result);
+
+    // Send WhatsApp Notification
+    const dateStr = new Date().toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const method = await this.prisma.paymentMethod.findUnique({ where: { id: dto.methodId } });
+    const capitalizedType = dto.type.charAt(0).toUpperCase() + dto.type.slice(1);
+    const msg = `👔 *STAFF ${capitalizedType.toUpperCase()} PROCESSED*\n\nStaff: ${staff.name} (${staff.role})\nAmount: Rs. ${amount.toLocaleString()}\nMethod: ${method?.name || 'N/A'}\nMonth: ${dto.month}\nDate: ${dateStr}`;
+    await this.whatsapp.sendSystemNotification('staff', msg);
+
     return result;
   }
 

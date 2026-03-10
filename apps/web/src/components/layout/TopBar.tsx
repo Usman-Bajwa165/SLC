@@ -10,7 +10,6 @@ const titles: Record<string, string> = {
   "/payments": "Financial Records",
   "/accounts": "Ledger Accounts",
   "/reports": "Analytics & Reports",
-  "/import-export": "Data Migration",
 };
 
 export default function TopBar() {
