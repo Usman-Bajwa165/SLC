@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -7,6 +7,7 @@ import {
   accountsApi,
   departmentsApi,
   sessionsApi,
+  staffApi,
 } from "@/lib/api/client";
 import { cn, formatDateTime, formatCurrency } from "@/lib/utils";
 import { exportToPDF } from "@/lib/report-utils";
@@ -29,9 +30,12 @@ import {
   Wallet,
   Printer,
   FileText,
+  CheckCircle,
+  AlertCircle,
+  TrendingUp,
 } from "lucide-react";
 
-const TABS = ["Students", "Daily Receipts", "Accounts"];
+const TABS = ["Students", "Staff", "Daily Receipts", "Accounts"];
 
 export default function ReportsPage() {
   const searchParams = useSearchParams();
@@ -73,6 +77,7 @@ export default function ReportsPage() {
           {tab === "Students" && <OutstandingReport />}
           {tab === "Daily Receipts" && <DailyReceiptsReport />}
           {tab === "Accounts" && <AccountsReport />}
+          {tab === "Staff" && <StaffReport />}
         </div>
       </div>
     </div>
@@ -864,11 +869,16 @@ function AccountsReport() {
   const allAccounts = (accounts as any)?.data || accounts || [];
   const dashboard = dashboardRaw || {};
   const cashBalance = Number(dashboard.cashBalance || 0);
+  const accountBalance = allAccounts.reduce(
+    (s: any, a: any) => s + Number(a.currentBalance || 0),
+    0,
+  );
+  const totalBalance = cashBalance + accountBalance;
 
   return (
     <div className="h-full flex flex-col p-3 space-y-3 overflow-hidden print:p-0 print:overflow-visible print:h-auto">
       <div className="flex items-center justify-between print:hidden">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1 mr-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 flex-1 mr-4">
           <SummaryCard
             label="Cash in Hand"
             value={`PKR ${formatCurrency(cashBalance)}`}
@@ -876,8 +886,8 @@ function AccountsReport() {
             color="green"
           />
           <SummaryCard
-            label="Total Balance"
-            value={`PKR ${formatCurrency(allAccounts.reduce((s: any, a: any) => s + Number(a.currentBalance || 0), 0))}`}
+            label="Total Acc Balance"
+            value={`PKR ${formatCurrency(accountBalance)}`}
             icon={<Landmark className="w-5 h-5" />}
             color="blue"
           />
@@ -886,6 +896,12 @@ function AccountsReport() {
             value={allAccounts.length}
             icon={<Filter className="w-5 h-5" />}
             color="indigo"
+          />
+          <SummaryCard
+            label="Total Balance"
+            value={`PKR ${formatCurrency(totalBalance)}`}
+            icon={<TrendingUp className="w-5 h-5" />}
+            color="emerald"
           />
         </div>
         <div className="flex gap-2">
@@ -930,8 +946,16 @@ function AccountsReport() {
                 ]),
                 summary: [
                   {
+                    label: "Cash in Hand",
+                    value: `PKR ${formatCurrency(cashBalance)}`,
+                  },
+                  {
+                    label: "Total Acc Balance",
+                    value: `PKR ${formatCurrency(accountBalance)}`,
+                  },
+                  {
                     label: "Total Balance",
-                    value: `PKR ${formatCurrency(allAccounts.reduce((s: any, a: any) => s + Number(a.currentBalance || 0), 0))}`,
+                    value: `PKR ${formatCurrency(totalBalance)}`,
                   },
                   {
                     label: "Active Accounts",
@@ -1039,6 +1063,187 @@ function AccountsReport() {
                           className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors mx-auto"
                         >
                           <ChevronRight className="w-4 h-4 text-slate-400" />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function StaffReport() {
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+
+  const { data: staffRes, isLoading } = useQuery({
+    queryKey: ["staff-report", roleFilter],
+    queryFn: () => staffApi.list({ role: roleFilter || undefined }),
+  });
+
+  const staff = useMemo(() => {
+    const all = staffRes?.data || [];
+    if (!search) return all;
+    const s = search.toLowerCase();
+    return all.filter(
+      (st: any) =>
+        st.name?.toLowerCase().includes(s) ||
+        st.cnic?.includes(s) ||
+        st.role?.toLowerCase().includes(s),
+    );
+  }, [staffRes?.data, search]);
+
+  const totalSalary = staff.reduce(
+    (sum: number, s: any) => sum + parseFloat(s.salary || 0),
+    0,
+  );
+  const totalPaid = staff.reduce((sum: number, s: any) => {
+    const paid =
+      s.financeRecords?.reduce(
+        (s: number, f: any) => s + parseFloat(f.salaryPaid || 0),
+        0,
+      ) || 0;
+    return sum + paid;
+  }, 0);
+  const totalRemaining = staff.reduce((sum: number, s: any) => {
+    const rem =
+      s.financeRecords?.reduce(
+        (s: number, f: any) => s + parseFloat(f.remaining || 0),
+        0,
+      ) || 0;
+    return sum + rem;
+  }, 0);
+
+  return (
+    <div className="h-full flex flex-col p-3 space-y-3 overflow-hidden">
+      <div className="flex gap-3 bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
+        <div className="flex-1 relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search staff..."
+            className="input-field !pl-12 bg-white shadow-sm border-slate-200"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="input-field bg-white shadow-sm border-slate-200 text-xs font-bold"
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+        >
+          <option value="">All Roles</option>
+          <option value="principal">Principal</option>
+          <option value="president">President</option>
+          <option value="manager">Manager</option>
+          <option value="admin">Admin</option>
+          <option value="teacher">Teacher</option>
+          <option value="peon">Peon</option>
+          <option value="guard">Guard</option>
+          <option value="others">Others</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <SummaryCard
+          label="Total Staff"
+          value={staff.length}
+          icon={<User className="w-5 h-5" />}
+          color="blue"
+        />
+        <SummaryCard
+          label="Monthly Salary"
+          value={`PKR ${formatCurrency(totalSalary)}`}
+          icon={<Wallet className="w-5 h-5" />}
+          color="indigo"
+        />
+        <SummaryCard
+          label="Total Paid"
+          value={`PKR ${formatCurrency(totalPaid)}`}
+          icon={<CheckCircle className="w-5 h-5" />}
+          color="green"
+        />
+        <SummaryCard
+          label="Remaining"
+          value={`PKR ${formatCurrency(totalRemaining)}`}
+          icon={<AlertCircle className="w-5 h-5" />}
+          color="red"
+        />
+      </div>
+
+      <div className="flex-1 overflow-x-auto overflow-y-auto rounded-3xl border border-slate-100 shadow-sm bg-white">
+        <table className="w-full text-sm border-separate border-spacing-0">
+          <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-widest sticky top-0 z-20">
+            <tr>
+              <th className="px-6 py-5 text-left">Name / CNIC</th>
+              <th className="px-6 py-5 text-left">Role</th>
+              <th className="px-6 py-5 text-left">Contact</th>
+              <th className="px-6 py-5 text-right">Salary</th>
+              <th className="px-6 py-5 text-right">Paid</th>
+              <th className="px-6 py-5 text-right">Remaining</th>
+              <th className="px-6 py-5 text-center">Ledger</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {isLoading
+              ? [...Array(5)].map((_, i) => (
+                  <tr key={i}>
+                    <td colSpan={7} className="px-6 py-5">
+                      <div className="h-10 bg-slate-50 rounded-2xl animate-pulse" />
+                    </td>
+                  </tr>
+                ))
+              : staff.map((s: any) => {
+                  const paid =
+                    s.financeRecords?.reduce(
+                      (sum: number, f: any) =>
+                        sum + parseFloat(f.salaryPaid || 0),
+                      0,
+                    ) || 0;
+                  const remaining =
+                    s.financeRecords?.reduce(
+                      (sum: number, f: any) =>
+                        sum + parseFloat(f.remaining || 0),
+                      0,
+                    ) || 0;
+
+                  return (
+                    <tr
+                      key={s.id}
+                      className="hover:bg-slate-50/50 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-slate-900">{s.name}</p>
+                        <p className="text-[10px] font-black text-slate-900 uppercase">
+                          {s.cnic}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-2.5 py-1 bg-slate-100 rounded-lg text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                          {s.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
+                        {s.contact}
+                      </td>
+                      <td className="px-6 py-4 text-right font-bold text-slate-600 uppercase text-[10px]">
+                        PKR {formatCurrency(s.salary)}
+                      </td>
+                      <td className="px-6 py-4 text-right font-bold text-green-600 uppercase text-[10px]">
+                        PKR {formatCurrency(paid)}
+                      </td>
+                      <td className="px-6 py-4 text-right font-black text-red-600 uppercase text-[10px]">
+                        PKR {formatCurrency(remaining)}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <Link
+                          href={`/reports/staff-ledger/${s.id}`}
+                          className="p-2.5 rounded-xl hover:bg-brand-blue/10 text-brand-blue transition-colors group flex items-center justify-center"
+                        >
+                          <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                         </Link>
                       </td>
                     </tr>

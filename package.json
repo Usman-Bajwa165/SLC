@@ -10,7 +10,7 @@
     "dev": "kill-port 3000 3001 && npm run sync:env && concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
-    "dev:infra": "kill-port 3000 3001 && docker compose up -d db redis minio",
+    "dev:infra": "kill-port 3000 3001 && docker compose up -d db redis minio adminer",
     "dev:all": "npm run dev:infra && npm run dev",
     "sync:env": "node scripts/sync-env.js",
     "build": "npm run build --workspace=apps/api && npm run build --workspace=apps/web",

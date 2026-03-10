@@ -191,7 +191,11 @@ export class ReportsService {
 
   // ── Ledgers ────────────────────────────────────────────────────────────────
 
-  async studentLedger(studentId: number) {
+  async studentLedger(studentId: number, from?: string, to?: string) {
+    const dateQuery: any = {};
+    if (from) dateQuery.gte = new Date(from);
+    if (to) dateQuery.lte = new Date(to);
+
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, isDeleted: false },
       include: {
@@ -199,6 +203,7 @@ export class ReportsService {
         session: true,
         financeRecords: { orderBy: { createdAt: "asc" } },
         payments: {
+          where: Object.keys(dateQuery).length > 0 ? { date: dateQuery } : {},
           include: {
             method: { select: { name: true, type: true } },
             account: { select: { label: true } },
@@ -239,10 +244,24 @@ export class ReportsService {
     };
   }
 
-  async accountLedger(accountId: number) {
-    const [payments, otherItems] = await Promise.all([
+  async accountLedger(
+    accountId: number,
+    from?: string,
+    to?: string,
+    type?: string,
+  ) {
+    const dateQuery: any = {};
+    if (from) dateQuery.gte = new Date(from);
+    if (to) dateQuery.lte = new Date(to);
+
+    const hasDate = Object.keys(dateQuery).length > 0;
+
+    const [payments, otherItems, staffPayments] = await Promise.all([
       this.prisma.payment.findMany({
-        where: { accountId },
+        where: {
+          accountId,
+          ...(hasDate ? { date: dateQuery } : {}),
+        },
         include: {
           student: { select: { name: true, registrationNo: true } },
           method: true,
@@ -250,22 +269,43 @@ export class ReportsService {
         orderBy: { date: "desc" },
       }),
       (this.prisma as any).otherTransaction.findMany({
-        where: { accountId },
+        where: {
+          accountId,
+          ...(hasDate ? { date: dateQuery } : {}),
+          ...(type === "incoming"
+            ? { type: "income" }
+            : type === "outgoing"
+              ? { type: "expense" }
+              : {}),
+        },
+        orderBy: { date: "desc" },
+      }),
+      this.prisma.staffPayment.findMany({
+        where: {
+          accountId,
+          ...(hasDate ? { date: dateQuery } : {}),
+        },
+        include: {
+          staff: { select: { name: true } },
+          method: true,
+        },
         orderBy: { date: "desc" },
       }),
     ]);
 
     const logs = [
-      ...payments.map((p) => ({
-        id: `p-${p.id}`,
-        date: p.date,
-        type: "credit",
-        category: "Student Fee",
-        description: `Payment from ${p.student?.name || "Unknown Student"} - ${(p.student as any)?.registrationNo || "N/A"}`,
-        amount: p.amount,
-        reference: p.receiptNo,
-        senderName: p.senderName,
-      })),
+      ...(type === "outgoing"
+        ? []
+        : payments.map((p) => ({
+            id: `p-${p.id}`,
+            date: p.date,
+            type: "credit",
+            category: "Student Fee",
+            description: `Payment from ${p.student?.name || "Unknown Student"} - ${(p.student as any)?.registrationNo || "N/A"}`,
+            amount: p.amount,
+            reference: p.receiptNo,
+            senderName: p.senderName || p.receiverName,
+          }))),
       ...otherItems.map((t) => ({
         id: `t-${t.id}`,
         date: t.date,
@@ -276,12 +316,83 @@ export class ReportsService {
         reference: null,
         senderName: t.type === "income" ? t.senderName : t.receiverName,
       })),
+      ...(type === "incoming"
+        ? []
+        : staffPayments.map((sp) => ({
+            id: `sp-${sp.id}`,
+            date: sp.date,
+            type: "debit",
+            category: "Staff Salary",
+            description: `Staff payment to ${sp.staff?.name || "Unknown Staff"} (${sp.type})`,
+            amount: sp.amount,
+            reference: sp.month,
+            senderName: sp.receiverName,
+          }))),
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return {
       accountId,
       logs,
       totalCount: logs.length,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async staffLedger(staffId: number, from?: string, to?: string) {
+    const dateQuery: any = {};
+    if (from) dateQuery.gte = new Date(from);
+    if (to) dateQuery.lte = new Date(to);
+
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: staffId, isDeleted: false },
+      include: {
+        financeRecords: { orderBy: { month: "desc" } },
+        payments: {
+          where: Object.keys(dateQuery).length > 0 ? { date: dateQuery } : {},
+          include: {
+            method: { select: { name: true, type: true } },
+            account: { select: { label: true } },
+          },
+          orderBy: { date: "desc" },
+        },
+      },
+    });
+    if (!staff) return null;
+
+    const totalPaid = staff.payments.reduce(
+      (s, p) => s.plus(new Decimal(p.amount.toString())),
+      new Decimal(0),
+    );
+    const totalAdvance = staff.financeRecords.reduce(
+      (s, f) => s.plus(new Decimal(f.advanceTaken.toString())),
+      new Decimal(0),
+    );
+    const totalLoan = staff.financeRecords.reduce(
+      (s, f) => s.plus(new Decimal(f.loanTaken.toString())),
+      new Decimal(0),
+    );
+    const totalRemaining = staff.financeRecords.reduce(
+      (s, f) => s.plus(new Decimal(f.remaining.toString())),
+      new Decimal(0),
+    );
+
+    return {
+      staff,
+      logs: staff.payments.map((p) => ({
+        type: p.type,
+        date: p.date,
+        amount: p.amount,
+        method: p.method.name,
+        account: (p as any).account?.label || "Cash",
+        notes: p.notes,
+        month: p.month,
+        payerName: p.payerName,
+        receiverName: p.receiverName,
+      })),
+      totalPaid: totalPaid.toFixed(2),
+      totalAdvance: totalAdvance.toFixed(2),
+      totalLoan: totalLoan.toFixed(2),
+      totalRemaining: totalRemaining.toFixed(2),
       generatedAt: new Date().toISOString(),
     };
   }

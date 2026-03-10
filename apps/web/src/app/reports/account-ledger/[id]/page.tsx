@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { reportsApi, accountsApi } from "@/lib/api/client";
@@ -28,9 +29,19 @@ export default function AccountLedgerPage() {
     enabled: !!accountId,
   });
 
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [type, setType] = useState("all");
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["account-ledger", accountId],
-    queryFn: () => reportsApi.accountLedger(accountId),
+    queryKey: ["account-ledger", accountId, from, to, type],
+    queryFn: () =>
+      reportsApi.accountLedger(
+        accountId,
+        from || undefined,
+        to || undefined,
+        type === "all" ? undefined : type,
+      ),
     enabled: !!accountId,
   });
 
@@ -60,13 +71,63 @@ export default function AccountLedgerPage() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-slate-400 hover:text-brand-blue font-black uppercase text-[10px] tracking-widest transition-colors group"
-          >
-            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back to Accounts
-          </button>
+          <div className="flex flex-wrap items-center gap-4">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center gap-2 text-slate-400 hover:text-brand-blue font-black uppercase text-[10px] tracking-widest transition-colors group"
+            >
+              <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              Back
+            </button>
+            <div className="h-4 w-px bg-slate-200" />
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+                <Calendar className="w-3 h-3 text-slate-400" />
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className="bg-transparent border-none text-[10px] font-black uppercase outline-none text-slate-600 focus:text-brand-blue transition-colors"
+                />
+              </div>
+              <span className="text-[10px] font-black text-slate-300">TO</span>
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+                <Calendar className="w-3 h-3 text-slate-400" />
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="bg-transparent border-none text-[10px] font-black uppercase outline-none text-slate-600 focus:text-brand-blue transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="h-4 w-px bg-slate-200" />
+
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm text-[10px] font-black uppercase outline-none text-slate-600 focus:text-brand-blue transition-colors appearance-none cursor-pointer min-w-[120px]"
+            >
+              <option value="all">Any Type</option>
+              <option value="incoming">Incoming Only</option>
+              <option value="outgoing">Outgoing Only</option>
+            </select>
+
+            {(from || to || type !== "all") && (
+              <button
+                onClick={() => {
+                  setFrom("");
+                  setTo("");
+                  setType("all");
+                }}
+                className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:text-red-600 transition-colors ml-1"
+              >
+                Reset
+              </button>
+            )}
+          </div>
           <div className="flex gap-2">
             <button
               onClick={() => {

@@ -139,6 +139,7 @@ model PaymentMethod {
   isActive Boolean   @default(true)
   accounts Account[]
   payments Payment[]
+  staffPayments StaffPayment[]
   createdAt DateTime @default(now())
 
   @@map("payment_methods")
@@ -160,6 +161,7 @@ model Account {
   isActive        Boolean       @default(true)
   payments        Payment[]
   otherTransactions OtherTransaction[]
+  staffPayments   StaffPayment[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -240,4 +242,91 @@ model OtherTransaction {
   createdAt    DateTime @default(now())
 
   @@map("other_transactions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAFF
+// Staff member record with role, salary, and contact details.
+// ─────────────────────────────────────────────────────────────────────────────
+model Staff {
+  id             Int             @id @default(autoincrement())
+  name           String
+  cnic           String          // 13 digits
+  contact        String
+  role           String          // 'principal'|'president'|'manager'|'admin'|'teacher'|'peon'|'guard'|'others'
+  subject        String?         // For teachers
+  address        String?
+  joinedDate     DateTime
+  salary         Decimal         @db.Decimal(12, 2)
+  isActive       Boolean         @default(true)
+  isDeleted      Boolean         @default(false)
+  version        Int             @default(0)
+  financeRecords StaffFinance[]
+  payments       StaffPayment[]
+  salaryHistory  StaffSalaryHistory[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@map("staff")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAFF FINANCE
+// Monthly salary tracking with advances and loans.
+// ─────────────────────────────────────────────────────────────────────────────
+model StaffFinance {
+  id            Int      @id @default(autoincrement())
+  staff         Staff    @relation(fields: [staffId], references: [id])
+  staffId       Int
+  month         String   // e.g. "2024-01"
+  salaryDue     Decimal  @db.Decimal(12, 2)
+  salaryPaid    Decimal  @db.Decimal(12, 2) @default(0)
+  advanceTaken  Decimal  @db.Decimal(12, 2) @default(0)
+  loanTaken     Decimal  @db.Decimal(12, 2) @default(0)
+  remaining     Decimal  @db.Decimal(12, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([staffId, month])
+  @@map("staff_finance")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAFF PAYMENT
+// Payment records for staff salary, advance, or loan.
+// ─────────────────────────────────────────────────────────────────────────────
+model StaffPayment {
+  id           Int           @id @default(autoincrement())
+  staff        Staff         @relation(fields: [staffId], references: [id])
+  staffId      Int
+  amount       Decimal       @db.Decimal(12, 2)
+  date         DateTime      @default(now())
+  type         String        // 'salary' | 'advance' | 'loan'
+  month        String        // e.g. "2024-01"
+  method       PaymentMethod @relation(fields: [methodId], references: [id])
+  methodId     Int
+  account      Account?      @relation(fields: [accountId], references: [id])
+  accountId    Int?
+  payerName    String?       // Who paid
+  receiverName String?       // Staff member who received
+  notes        String?
+  createdAt    DateTime      @default(now())
+
+  @@map("staff_payments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAFF SALARY HISTORY
+// Tracks salary changes over time to ensure historical integrity.
+// ─────────────────────────────────────────────────────────────────────────────
+model StaffSalaryHistory {
+  id             Int      @id @default(autoincrement())
+  staff          Staff    @relation(fields: [staffId], references: [id])
+  staffId        Int
+  salary         Decimal  @db.Decimal(12, 2)
+  effectiveMonth String   // e.g. "2024-03"
+  createdAt      DateTime @default(now())
+
+  @@unique([staffId, effectiveMonth])
+  @@map("staff_salary_history")
 }

@@ -14,6 +14,7 @@ import {
   ChevronRight,
   UserPlus,
   Wallet,
+  Briefcase,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useState } from "react";
@@ -23,6 +24,7 @@ const nav = [
   { href: "/departments", label: "Departments", icon: Building2 },
   { href: "/students", label: "Students", icon: Users },
   { href: "/enrollment", label: "Enrollment", icon: UserPlus },
+  { href: "/staff", label: "Staff", icon: Briefcase },
   { href: "/payments", label: "Payments", icon: CreditCard },
   { href: "/accounts", label: "Accounts", icon: Landmark },
   { href: "/finance", label: "Finance", icon: Wallet },

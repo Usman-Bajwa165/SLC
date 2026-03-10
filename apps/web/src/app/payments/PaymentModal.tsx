@@ -56,14 +56,21 @@ export default function PaymentModal({
     }
   }, [isOpen, student]);
 
-  const handleKeyDown = (e: React.KeyboardEvent, isLastField: boolean = false) => {
+  const handleKeyDown = (
+    e: React.KeyboardEvent,
+    isLastField: boolean = false,
+  ) => {
     if (e.key === "Enter") {
       e.preventDefault();
       if (isLastField) {
         if (!isFormValid) return;
         submitBtnRef.current?.click();
       } else {
-        const inputs = Array.from(document.querySelectorAll('input:not([disabled]):not([type="hidden"]), select:not([disabled])'));
+        const inputs = Array.from(
+          document.querySelectorAll(
+            'input:not([disabled]):not([type="hidden"]), select:not([disabled])',
+          ),
+        );
         const currentIndex = inputs.indexOf(e.currentTarget as any);
         const nextInput = inputs[currentIndex + 1] as HTMLElement;
         nextInput?.focus();
@@ -85,14 +92,14 @@ export default function PaymentModal({
 
   const accounts = (accountsRaw as any)?.data || accountsRaw || [];
 
-  const isFormValid = 
-    form.advancePaid && 
-    form.paymentDate && 
-    form.paymentMethodId && 
+  const isFormValid =
+    form.advancePaid &&
+    form.paymentDate &&
+    form.paymentMethodId &&
     form.receiptNo &&
-    (form.paymentMethodId === "cash" 
-      ? form.receiverName 
-      : (form.accountId && form.senderName));
+    (form.paymentMethodId === "cash"
+      ? form.receiverName
+      : form.accountId && form.senderName);
 
   const currentFinance = student?.financeRecords?.find(
     (f: any) => !f.isSnapshot,
@@ -122,6 +129,11 @@ export default function PaymentModal({
         const method = paymentMethods.find((m: any) => m.type === methodType);
         if (method) {
           payload.paymentMethodId = method.id;
+          // If cash, map receiverName to senderName for the API
+          if (method.type === "cash") {
+            payload.senderName = payload.receiverName;
+            delete payload.receiverName;
+          }
         }
       }
 
@@ -136,7 +148,7 @@ export default function PaymentModal({
       queryClient.invalidateQueries({ queryKey: ["students"] });
       queryClient.invalidateQueries({ queryKey: ["student", studentId] });
       queryClient.invalidateQueries({ queryKey: ["payments"] });
-      
+
       setForm({
         advancePaid: "",
         paymentMethodId: "",
@@ -146,7 +158,7 @@ export default function PaymentModal({
         receiverName: "",
         paymentDate: new Date().toISOString().split("T")[0],
       });
-      
+
       if (returnUrl) {
         router.push(returnUrl);
       } else {
@@ -312,8 +324,8 @@ export default function PaymentModal({
                       })
                       .map((acc: any) => (
                         <option key={acc.id} value={acc.id}>
-                          {acc.label}{" "}
-                          {acc.accountNumber ? `(${acc.accountNumber})` : ""}
+                          {acc.label}
+                          {acc.accountNumber ? ` - ${acc.accountNumber}` : ""}
                         </option>
                       ))}
                   </select>
@@ -335,11 +347,11 @@ export default function PaymentModal({
             {form.paymentMethodId === "cash" && (
               <div>
                 <label className="block text-[9px] font-black text-slate-900 uppercase tracking-widest mb-1">
-                  Receiver Name *
+                  Payer Name *
                 </label>
                 <input
                   className="input-field !py-1.5 !text-sm !text-slate-900 font-bold"
-                  placeholder="Received by..."
+                  placeholder="Paid by (Student/Guardian)..."
                   value={form.receiverName}
                   onChange={(e) => set("receiverName", e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, true)}

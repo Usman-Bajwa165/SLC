@@ -36,6 +36,7 @@ export class PaymentsService {
       dateFrom,
       dateTo,
       q,
+      source = "all",
     } = query;
     const { skip, take } = paginate(page, limit);
 
@@ -52,27 +53,133 @@ export class PaymentsService {
       where.OR = [
         { receiptNo: { contains: q, mode: "insensitive" } },
         { student: { name: { contains: q, mode: "insensitive" } } },
-        { student: { rollNo: { contains: q, mode: "insensitive" } } },
       ];
     }
 
-    const [payments, total] = await this.prisma.$transaction([
-      this.prisma.payment.findMany({
-        where,
-        skip,
-        take,
-        include: {
-          student: { select: { id: true, name: true, registrationNo: true, rollNo: true, cnic: true } },
-          method: { select: { id: true, name: true, type: true } },
-          account: { select: { id: true, label: true, accountNumber: true } },
-          allocations: true,
-        },
-        orderBy: { date: "desc" },
-      }),
-      this.prisma.payment.count({ where }),
-    ]);
+    const staffWhere: any = {};
+    if (accountId) staffWhere.accountId = parseInt(accountId);
+    if (methodId) staffWhere.methodId = parseInt(methodId);
+    if (dateFrom || dateTo) {
+      staffWhere.date = {};
+      if (dateFrom) staffWhere.date.gte = new Date(dateFrom);
+      if (dateTo) staffWhere.date.lte = new Date(dateTo + "T23:59:59Z");
+    }
+    if (q) {
+      staffWhere.OR = [
+        { staff: { name: { contains: q, mode: "insensitive" } } },
+        { notes: { contains: q, mode: "insensitive" } },
+      ];
+    }
 
-    return paginatedResponse(payments, total, page, limit);
+    if (source === "student") {
+      const [payments, total] = await this.prisma.$transaction([
+        this.prisma.payment.findMany({
+          where,
+          skip,
+          take,
+          include: {
+            student: {
+              select: { name: true, rollNo: true, registrationNo: true },
+            },
+            method: { select: { name: true } },
+            account: { select: { label: true, accountNumber: true } },
+          },
+          orderBy: { date: "desc" },
+        }),
+        this.prisma.payment.count({ where }),
+      ]);
+      return paginatedResponse(
+        payments.map((p) => ({
+          ...p,
+          source: "student",
+          label: p.student.name,
+          reference: p.receiptNo,
+          type: "Student Fee",
+        })),
+        total,
+        page,
+        limit,
+      );
+    }
+
+    if (source === "staff") {
+      const [payments, total] = await this.prisma.$transaction([
+        this.prisma.staffPayment.findMany({
+          where: staffWhere,
+          skip,
+          take,
+          include: {
+            staff: { select: { name: true } },
+            method: { select: { name: true } },
+            account: { select: { label: true, accountNumber: true } },
+          },
+          orderBy: { date: "desc" },
+        }),
+        this.prisma.staffPayment.count({ where: staffWhere }),
+      ]);
+      return paginatedResponse(
+        payments.map((p) => ({
+          ...p,
+          source: "staff",
+          label: p.staff.name,
+          reference: p.month,
+          type: `Staff ${p.type.charAt(0).toUpperCase() + p.type.slice(1)}`,
+        })),
+        total,
+        page,
+        limit,
+      );
+    }
+
+    // Default: 'all'
+    const [allStudents, allStaff, totalStudent, totalStaff] =
+      await this.prisma.$transaction([
+        this.prisma.payment.findMany({
+          where,
+          include: {
+            student: {
+              select: { name: true, rollNo: true, registrationNo: true },
+            },
+            method: { select: { name: true } },
+            account: { select: { label: true, accountNumber: true } },
+          },
+          orderBy: { date: "desc" },
+          take: skip + take, // Fetch enough to cover current page
+        }),
+        this.prisma.staffPayment.findMany({
+          where: staffWhere,
+          include: {
+            staff: { select: { name: true } },
+            method: { select: { name: true } },
+            account: { select: { label: true, accountNumber: true } },
+          },
+          orderBy: { date: "desc" },
+          take: skip + take, // Fetch enough to cover current page
+        }),
+        this.prisma.payment.count({ where }),
+        this.prisma.staffPayment.count({ where: staffWhere }),
+      ]);
+
+    const merged = [
+      ...allStudents.map((p) => ({
+        ...p,
+        source: "student",
+        label: p.student.name,
+        reference: p.receiptNo,
+        type: "Student Fee",
+      })),
+      ...allStaff.map((p) => ({
+        ...p,
+        source: "staff",
+        label: p.staff.name,
+        reference: p.month,
+        type: `Staff ${p.type.charAt(0).toUpperCase() + p.type.slice(1)}`,
+      })),
+    ]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(skip, skip + take);
+
+    return paginatedResponse(merged, totalStudent + totalStaff, page, limit);
   }
 
   async findOne(id: number) {
@@ -127,7 +234,7 @@ export class PaymentsService {
         data: {
           studentId: dto.studentId,
           amount,
-          date: dto.date ? new Date(dto.date) : new Date(),
+          date: this.prisma.getPakistaniDate(dto.date),
           methodId: dto.methodId,
           accountId: dto.accountId,
           receiptNo,

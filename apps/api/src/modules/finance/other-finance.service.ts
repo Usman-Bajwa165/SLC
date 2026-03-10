@@ -20,7 +20,7 @@ export class OtherFinanceService {
           amount: new Decimal(dto.amount),
           accountId: dto.accountId,
           notes: dto.notes,
-          date: dto.date ? new Date(dto.date) : new Date(),
+          date: this.prisma.getPakistaniDate(dto.date),
           senderName: dto.senderName,
           receiverName: dto.receiverName,
         },
@@ -77,6 +77,6 @@ export class OtherFinanceService {
       by: ["category"],
       _count: true,
     });
-    return categories.map((c) => c.category);
+    return categories.map((c) => c.category).filter((c) => c !== "Salary");
   }
 }

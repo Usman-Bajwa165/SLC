@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { reportsApi } from "@/lib/api/client";
@@ -22,9 +23,13 @@ export default function StudentLedgerPage() {
   const router = useRouter();
   const studentId = Number(id);
 
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["student-ledger", studentId],
-    queryFn: () => reportsApi.studentLedger(studentId),
+    queryKey: ["student-ledger", studentId, from, to],
+    queryFn: () =>
+      reportsApi.studentLedger(studentId, from || undefined, to || undefined),
     enabled: !!studentId,
   });
 
@@ -70,13 +75,48 @@ export default function StudentLedgerPage() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-slate-400 hover:text-brand-blue font-black uppercase text-[10px] tracking-widest transition-colors group"
-          >
-            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back to Reports
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center gap-2 text-slate-400 hover:text-brand-blue font-black uppercase text-[10px] tracking-widest transition-colors group"
+            >
+              <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              Back
+            </button>
+            <div className="h-4 w-px bg-slate-200" />
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+                <Calendar className="w-3 h-3 text-slate-400" />
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className="bg-transparent border-none text-[10px] font-black uppercase outline-none text-slate-600 focus:text-brand-blue transition-colors"
+                />
+              </div>
+              <span className="text-[10px] font-black text-slate-300">TO</span>
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+                <Calendar className="w-3 h-3 text-slate-400" />
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="bg-transparent border-none text-[10px] font-black uppercase outline-none text-slate-600 focus:text-brand-blue transition-colors"
+                />
+              </div>
+              {(from || to) && (
+                <button
+                  onClick={() => {
+                    setFrom("");
+                    setTo("");
+                  }}
+                  className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:text-red-600 transition-colors ml-1"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={() => {

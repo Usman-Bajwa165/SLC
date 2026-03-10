@@ -23,7 +23,6 @@ import { reportsApi } from "@/lib/api/client";
 import { Banknote, Landmark, ReceiptText } from "lucide-react";
 
 const EXPENSE_CATEGORIES = [
-  "Salary",
   "Utility Bills",
   "Daily Expense",
   "Maintenance",
@@ -77,7 +76,7 @@ export default function FinancePage() {
           id: `payment-${p.id}`,
           category: "Student Fees",
           date: p.date,
-          notes: `Payment from ${p.student?.name || 'Student'} - ${p.student?.registrationNo || 'N/A'}`,
+          notes: `Payment from ${p.student?.name || "Student"} - ${p.student?.registrationNo || "N/A"}`,
           amount: p.amount,
           accountId: p.accountId,
           account: p.account,
@@ -469,10 +468,13 @@ export default function FinancePage() {
                           </div>
                           {(t.senderName || t.receiverName) && (
                             <p className="text-[10px] text-slate-500 font-medium mt-0.5 ml-5">
-                              {tab === "income" 
-                                ? (t.accountId ? t.senderName : t.receiverName)
-                                : (t.accountId ? t.receiverName : t.senderName)
-                              }
+                              {tab === "income"
+                                ? t.accountId
+                                  ? t.senderName
+                                  : t.receiverName
+                                : t.accountId
+                                  ? t.receiverName
+                                  : t.senderName}
                             </p>
                           )}
                         </div>

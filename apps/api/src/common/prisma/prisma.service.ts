@@ -1,5 +1,11 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
+import * as dayjs from "dayjs";
+import * as utc from "dayjs/plugin/utc";
+import * as timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 @Injectable()
 export class PrismaService
@@ -39,5 +45,26 @@ export class PrismaService
     `;
     const seq = result[0].nextval.toString().padStart(5, "0");
     return `${prefix}-${year}-${seq}`;
+  }
+
+  /**
+   * Returns a Date object in Pakistani Timezone (UTC+5)
+   * If input is provided (YYYY-MM-DD), it combines it with current time to preserve the recording second.
+   */
+  getPakistaniDate(input?: string): Date {
+    const tz = "Asia/Karachi";
+    const now = dayjs().tz(tz);
+
+    if (input) {
+      // If input is YYYY-MM-DD, merge with current HH:mm:ss.SSS
+      return dayjs(input)
+        .set("hour", now.hour())
+        .set("minute", now.minute())
+        .set("second", now.second())
+        .set("millisecond", now.millisecond())
+        .toDate();
+    }
+
+    return now.toDate();
   }
 }

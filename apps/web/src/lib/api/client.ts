@@ -127,8 +127,12 @@ export const reportsApi = {
     departmentId?: number;
     sessionId?: number;
   }) => get<any>("/reports/daily-receipts", params),
-  studentLedger: (id: number) => get<any>(`/reports/student-ledger/${id}`),
-  accountLedger: (id: number) => get<any>(`/reports/account-ledger/${id}`),
+  studentLedger: (id: number, from?: string, to?: string) =>
+    get<any>(`/reports/student-ledger/${id}`, { from, to }),
+  accountLedger: (id: number, from?: string, to?: string, type?: string) =>
+    get<any>(`/reports/account-ledger/${id}`, { from, to, type }),
+  staffLedger: (id: number, from?: string, to?: string) =>
+    get<any>(`/reports/staff-ledger/${id}`, { from, to }),
   advanceSummary: (params?: any) =>
     get<any>("/reports/advance-summary", params),
 };
@@ -138,4 +142,22 @@ export const financeApi = {
   list: (params?: any) => get<any>("/finance/other", params),
   create: (dto: any) => post<any>("/finance/other", dto),
   categories: () => get<string[]>("/finance/other/categories"),
+};
+
+// ── Staff ─────────────────────────────────────────────────────────────────────
+export const staffApi = {
+  list: (params?: {
+    q?: string;
+    role?: string;
+    isActive?: string;
+    month?: string;
+    page?: number;
+    limit?: number;
+  }) => get<any>("/staff", params),
+  get: (id: number) => get<any>(`/staff/${id}`),
+  create: (dto: any) => post<any>("/staff", dto),
+  update: (id: number, dto: any) => put<any>(`/staff/${id}`, dto),
+  delete: (id: number) => del<any>(`/staff/${id}`),
+  createPayment: (dto: any) => post<any>("/staff/payments", dto),
+  ledger: (id: number) => get<any>(`/staff/${id}/ledger`),
 };

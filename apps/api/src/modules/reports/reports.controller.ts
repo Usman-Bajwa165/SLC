@@ -54,13 +54,31 @@ export class ReportsController {
   }
 
   @Get("student-ledger/:id")
-  studentLedger(@Param("id", ParseIntPipe) id: number) {
-    return this.service.studentLedger(id);
+  studentLedger(
+    @Param("id", ParseIntPipe) id: number,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    return this.service.studentLedger(id, from, to);
   }
 
   @Get("account-ledger/:id")
-  accountLedger(@Param("id", ParseIntPipe) id: number) {
-    return this.service.accountLedger(id);
+  accountLedger(
+    @Param("id", ParseIntPipe) id: number,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("type") type?: string,
+  ) {
+    return this.service.accountLedger(id, from, to, type);
+  }
+
+  @Get("staff-ledger/:id")
+  staffLedger(
+    @Param("id", ParseIntPipe) id: number,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    return this.service.staffLedger(id, from, to);
   }
 
   // ── CSV Exports ─────────────────────────────────────────────────────────────

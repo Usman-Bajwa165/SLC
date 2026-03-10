@@ -19,6 +19,17 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Adminer (Database GUI) ───────────────────────────────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: slc_adminer
+    restart: unless-stopped
+    ports:
+      - '8081:8080'
+    depends_on:
+      db:
+        condition: service_healthy
+
   # ── Redis ────────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine

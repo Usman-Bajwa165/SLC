@@ -15,7 +15,10 @@ import {
   TrendingUp,
   FileText,
   UserPlus,
+  Printer,
+  Download,
 } from "lucide-react";
+import { exportToPDF } from "@/lib/report-utils";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { showBar, hideBar } from "@/lib/progress";
@@ -54,9 +57,19 @@ export default function StudentsPage() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status, outstanding }: { id: number; status: string; outstanding: number }) => {
+    mutationFn: ({
+      id,
+      status,
+      outstanding,
+    }: {
+      id: number;
+      status: string;
+      outstanding: number;
+    }) => {
       if (status === "graduated" && outstanding > 0) {
-        throw new Error(`Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`);
+        throw new Error(
+          `Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`,
+        );
       }
       showBar();
       return studentsApi.update(id, { status });
@@ -75,7 +88,9 @@ export default function StudentsPage() {
   const graduateMutation = useMutation({
     mutationFn: ({ id, outstanding }: { id: number; outstanding: number }) => {
       if (outstanding > 0) {
-        throw new Error(`Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`);
+        throw new Error(
+          `Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`,
+        );
       }
       showBar();
       return studentsApi.update(id, { status: "graduated" });
@@ -94,7 +109,14 @@ export default function StudentsPage() {
   const { data, isLoading } = useQuery({
     queryKey: [
       "students",
-      { q: search, department: dept, session: sessionId, currentLevel, status, page },
+      {
+        q: search,
+        department: dept,
+        session: sessionId,
+        currentLevel,
+        status,
+        page,
+      },
     ],
     queryFn: () =>
       studentsApi.list({
@@ -122,8 +144,8 @@ export default function StudentsPage() {
   const showBulkActions = dept && sessionId && currentLevel;
 
   const toggleSelection = (id: number) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -139,7 +161,7 @@ export default function StudentsPage() {
     mutationFn: async (ids: number[]) => {
       showBar();
       const results = await Promise.allSettled(
-        ids.map(id => studentsApi.promote(id))
+        ids.map((id) => studentsApi.promote(id)),
       );
       return results;
     },
@@ -159,7 +181,7 @@ export default function StudentsPage() {
     mutationFn: async (ids: number[]) => {
       showBar();
       const results = await Promise.allSettled(
-        ids.map(id => studentsApi.update(id, { status: "graduated" }))
+        ids.map((id) => studentsApi.update(id, { status: "graduated" })),
       );
       return results;
     },
@@ -178,7 +200,7 @@ export default function StudentsPage() {
   // Get active levels from current students list when session is selected
   const selectedDept = depts?.find((d: any) => d.id === Number(dept));
   const activeLevels = new Set<number>();
-  
+
   if (sessionId && students.length > 0) {
     students.forEach((s: any) => {
       if (s.currentSemester) {
@@ -186,8 +208,58 @@ export default function StudentsPage() {
       }
     });
   }
-  
+
   const sortedLevels = Array.from(activeLevels).sort((a, b) => a - b);
+
+  const handleExport = () => {
+    const columns = [
+      "Roll No",
+      "Registration",
+      "Full Name",
+      "Department",
+      "Level",
+      "Status",
+      "Outstanding",
+    ];
+    const exportData = students.map((s: any) => {
+      const outstanding =
+        s.financeRecords?.reduce(
+          (sum: number, f: any) => sum + parseFloat(f.remaining || 0),
+          0,
+        ) ?? 0;
+      return [
+        s.rollNo || "N/A",
+        s.registrationNo,
+        s.name,
+        s.department?.code || s.department?.name,
+        s.currentSemester
+          ? `${s.programMode === "semester" ? "Sem" : "Year"} ${s.currentSemester}`
+          : "N/A",
+        s.status.toUpperCase(),
+        `PKR ${outstanding.toLocaleString()}`,
+      ];
+    });
+
+    exportToPDF({
+      title: "Student Enrollment Directory",
+      filename: "students_report",
+      columns,
+      data: exportData,
+      summary: [
+        { label: "Total Students", value: students.length.toString() },
+        {
+          label: "Department",
+          value: dept
+            ? depts?.find((d: any) => d.id === Number(dept))?.name
+            : "All Departments",
+        },
+      ],
+    });
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <div className="h-full flex flex-col space-y-4 animate-fade-in p-2 max-w-[1600px] mx-auto overflow-hidden">
@@ -208,27 +280,37 @@ export default function StudentsPage() {
                   const idsWithDues = students
                     .filter((s: any) => {
                       if (!selectedIds.includes(s.id)) return false;
-                      const outstanding = s.financeRecords?.reduce(
-                        (sum: number, f: any) => sum + parseFloat(f.remaining || 0),
-                        0,
-                      ) ?? 0;
+                      const outstanding =
+                        s.financeRecords?.reduce(
+                          (sum: number, f: any) =>
+                            sum + parseFloat(f.remaining || 0),
+                          0,
+                        ) ?? 0;
                       return outstanding > 0;
                     })
                     .map((s: any) => s.id);
-                  
-                  setSelectedIds(prev => prev.filter(id => !idsWithDues.includes(id)));
-                  toast.success(`Unchecked ${idsWithDues.length} students with outstanding dues`);
+
+                  setSelectedIds((prev) =>
+                    prev.filter((id) => !idsWithDues.includes(id)),
+                  );
+                  toast.success(
+                    `Unchecked ${idsWithDues.length} students with outstanding dues`,
+                  );
                 }}
                 className="btn-secondary flex items-center gap-2"
               >
                 <CheckCircle2 className="w-4 h-4" /> Uncheck Dues
               </button>
               {(() => {
-                const selectedStudents = students.filter((s: any) => selectedIds.includes(s.id));
+                const selectedStudents = students.filter((s: any) =>
+                  selectedIds.includes(s.id),
+                );
                 const allAtFinalTerm = selectedStudents.every((s: any) => {
-                  const totalTerms = s.programMode === "semester"
-                    ? (s.department?.semsPerYear || 2) * (s.department?.yearsDuration || 4)
-                    : s.department?.yearsDuration || 4;
+                  const totalTerms =
+                    s.programMode === "semester"
+                      ? (s.department?.semsPerYear || 2) *
+                        (s.department?.yearsDuration || 4)
+                      : s.department?.yearsDuration || 4;
                   return (s.currentSemester || 0) >= totalTerms;
                 });
 
@@ -237,25 +319,34 @@ export default function StudentsPage() {
                     <button
                       onClick={() => {
                         const withDues = selectedStudents.filter((s: any) => {
-                          const outstanding = s.financeRecords?.reduce(
-                            (sum: number, f: any) => sum + parseFloat(f.remaining || 0),
-                            0,
-                          ) ?? 0;
+                          const outstanding =
+                            s.financeRecords?.reduce(
+                              (sum: number, f: any) =>
+                                sum + parseFloat(f.remaining || 0),
+                              0,
+                            ) ?? 0;
                           return outstanding > 0;
                         });
-                        
+
                         if (withDues.length > 0) {
-                          toast.error(`Cannot graduate: ${withDues.length} students have outstanding dues. Please uncheck them first.`);
+                          toast.error(
+                            `Cannot graduate: ${withDues.length} students have outstanding dues. Please uncheck them first.`,
+                          );
                           return;
                         }
-                        
-                        if (window.confirm(`Graduate ${selectedIds.length} selected students?`)) {
+
+                        if (
+                          window.confirm(
+                            `Graduate ${selectedIds.length} selected students?`,
+                          )
+                        ) {
                           bulkGraduateMutation.mutate(selectedIds);
                         }
                       }}
                       className="btn-primary flex items-center gap-2 bg-purple-600 hover:bg-purple-700"
                     >
-                      <GraduationCap className="w-4 h-4" /> Graduate All ({selectedIds.length})
+                      <GraduationCap className="w-4 h-4" /> Graduate All (
+                      {selectedIds.length})
                     </button>
                   );
                 } else {
@@ -263,32 +354,57 @@ export default function StudentsPage() {
                     <button
                       onClick={() => {
                         const withDues = selectedStudents.filter((s: any) => {
-                          const outstanding = s.financeRecords?.reduce(
-                            (sum: number, f: any) => sum + parseFloat(f.remaining || 0),
-                            0,
-                          ) ?? 0;
+                          const outstanding =
+                            s.financeRecords?.reduce(
+                              (sum: number, f: any) =>
+                                sum + parseFloat(f.remaining || 0),
+                              0,
+                            ) ?? 0;
                           return outstanding > 0;
                         });
-                        
+
                         if (withDues.length > 0) {
-                          if (window.confirm(`${selectedIds.length} selected. ${withDues.length} students have outstanding dues. Still want to promote them?`)) {
+                          if (
+                            window.confirm(
+                              `${selectedIds.length} selected. ${withDues.length} students have outstanding dues. Still want to promote them?`,
+                            )
+                          ) {
                             bulkPromoteMutation.mutate(selectedIds);
                           }
                         } else {
-                          if (window.confirm(`Promote ${selectedIds.length} selected students?`)) {
+                          if (
+                            window.confirm(
+                              `Promote ${selectedIds.length} selected students?`,
+                            )
+                          ) {
                             bulkPromoteMutation.mutate(selectedIds);
                           }
                         }
                       }}
                       className="btn-primary flex items-center gap-2 bg-brand-gold hover:bg-brand-gold/90"
                     >
-                      <TrendingUp className="w-4 h-4" /> Promote All ({selectedIds.length})
+                      <TrendingUp className="w-4 h-4" /> Promote All (
+                      {selectedIds.length})
                     </button>
                   );
                 }
               })()}
             </>
           )}
+          <button
+            onClick={handlePrint}
+            className="btn-secondary flex items-center gap-2"
+            title="Print Page"
+          >
+            <Printer className="w-4 h-4" /> Print
+          </button>
+          <button
+            onClick={handleExport}
+            className="btn-secondary flex items-center gap-2"
+            title="Export to PDF"
+          >
+            <Download className="w-4 h-4" /> Export
+          </button>
           <Link
             href="/enrollment"
             className="btn-primary flex items-center gap-2 group shadow-brand-gold/20 hover:scale-105 transition-all w-full md:w-auto"
@@ -299,8 +415,7 @@ export default function StudentsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
 
       <div className="card-premium p-4 flex flex-col md:flex-row items-center gap-4">
         <div className="flex items-center gap-2 px-3 py-2 bg-brand-blue/5 rounded-xl">
@@ -365,7 +480,11 @@ export default function StudentsPage() {
             disabled={!sessionId}
           >
             <option value="">
-              {!dept ? "Level" : selectedDept?.offersSem ? "All Sems" : "All Years"}
+              {!dept
+                ? "Level"
+                : selectedDept?.offersSem
+                  ? "All Sems"
+                  : "All Years"}
             </option>
             {sortedLevels.map((level) => (
               <option key={level} value={level}>
@@ -399,7 +518,10 @@ export default function StudentsPage() {
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-12">
                     <input
                       type="checkbox"
-                      checked={selectedIds.length === students.length && students.length > 0}
+                      checked={
+                        selectedIds.length === students.length &&
+                        students.length > 0
+                      }
                       onChange={toggleAll}
                       className="w-4 h-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue cursor-pointer"
                     />
@@ -539,7 +661,8 @@ export default function StudentsPage() {
                       </td>
                       <td className="px-6 py-5">
                         <div className="flex flex-col items-center gap-1">
-                          {(s.cgpa || s.sgpa) && (s.obtainedMarks || s.totalMarks) ? (
+                          {(s.cgpa || s.sgpa) &&
+                          (s.obtainedMarks || s.totalMarks) ? (
                             <div className="flex flex-col items-center">
                               {s.cgpa && (
                                 <p className="text-[10px] font-black text-slate-700">
@@ -638,13 +761,13 @@ export default function StudentsPage() {
                           onChange={(e) => {
                             const newStatus = e.target.value;
                             if (newStatus === "graduated" && outstanding > 0) {
-                              toast.error(`Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`);
+                              toast.error(
+                                `Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`,
+                              );
                               return;
                             }
                             if (
-                              window.confirm(
-                                `Change status to ${newStatus}?`,
-                              )
+                              window.confirm(`Change status to ${newStatus}?`)
                             ) {
                               updateStatusMutation.mutate({
                                 id: s.id,
@@ -704,13 +827,18 @@ export default function StudentsPage() {
                             <button
                               onClick={() => {
                                 if (outstanding > 0) {
-                                  toast.error(`Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`);
+                                  toast.error(
+                                    `Cannot graduate: Outstanding dues of PKR ${outstanding.toLocaleString()} must be cleared first.`,
+                                  );
                                   return;
                                 }
                                 if (
                                   window.confirm(`Mark ${s.name} as Graduated?`)
                                 ) {
-                                  graduateMutation.mutate({ id: s.id, outstanding });
+                                  graduateMutation.mutate({
+                                    id: s.id,
+                                    outstanding,
+                                  });
                                 }
                               }}
                               disabled={graduateMutation.isPending}

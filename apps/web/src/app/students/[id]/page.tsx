@@ -20,11 +20,19 @@ import {
   Hash,
   Wallet,
   History,
+  Printer,
+  Download,
 } from "lucide-react";
+import { exportToPDF } from "@/lib/report-utils";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { showBar, hideBar } from "@/lib/progress";
-import { formatCurrency, formatDateTime, formatContact, formatCNIC } from "@/lib/utils";
+import {
+  formatCurrency,
+  formatDateTime,
+  formatContact,
+  formatCNIC,
+} from "@/lib/utils";
 import { toast } from "sonner";
 
 const TABS = ["Details", "Finance", "Payments", "Academic"];
@@ -57,6 +65,44 @@ export default function StudentDetailPage() {
       setPromoting(false);
     },
   });
+
+  const handleExport = () => {
+    if (!student) return;
+
+    const summary = [
+      { label: "Registration", value: student.registrationNo },
+      { label: "Roll No", value: student.rollNo || "N/A" },
+      { label: "Department", value: student.department?.name },
+      { label: "Session", value: student.session?.label || "N/A" },
+      { label: "Program Mode", value: student.programMode.toUpperCase() },
+      {
+        label: "Current Level",
+        value: (student.currentSemester || "N/A").toString(),
+      },
+      { label: "Status", value: student.status.toUpperCase() },
+    ];
+
+    const financeColumns = ["Term", "Fee Due", "Paid", "Arrears", "Remaining"];
+    const financeData = (student.financeRecords || []).map((f: any) => [
+      f.termLabel,
+      `PKR ${Number(f.feeDue).toLocaleString()}`,
+      `PKR ${Number(f.feePaid).toLocaleString()}`,
+      `PKR ${Number(f.carryOver).toLocaleString()}`,
+      `PKR ${Number(f.remaining).toLocaleString()}`,
+    ]);
+
+    exportToPDF({
+      title: `Student Profile - ${student.name}`,
+      filename: `student_${student.registrationNo}`,
+      columns: financeColumns,
+      data: financeData,
+      summary,
+    });
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   if (isLoading)
     return (
@@ -129,6 +175,20 @@ export default function StudentDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handlePrint}
+            className="p-3 bg-white border border-slate-100 rounded-2xl shadow-sm hover:bg-slate-50 transition-all text-slate-400 hover:text-brand-blue"
+            title="Print Profile"
+          >
+            <Printer className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleExport}
+            className="p-3 bg-white border border-slate-100 rounded-2xl shadow-sm hover:bg-slate-50 transition-all text-slate-400 hover:text-brand-blue"
+            title="Export Profile to PDF"
+          >
+            <Download className="w-5 h-5" />
+          </button>
           <Link
             href={`/enrollment?tab=existing&studentId=${id}`}
             className="px-5 py-2.5 border-2 border-slate-200 text-slate-500 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-2"
@@ -596,15 +656,17 @@ function AcademicTab({ student, onPromote, promoting }: any) {
     queryFn: () => departmentsApi.get(student.departmentId),
   });
 
-  const totalTerms = student.programMode === "semester"
-    ? (dept?.yearsDuration || 0) * (dept?.semsPerYear || 0)
-    : dept?.yearsDuration || 0;
+  const totalTerms =
+    student.programMode === "semester"
+      ? (dept?.yearsDuration || 0) * (dept?.semsPerYear || 0)
+      : dept?.yearsDuration || 0;
   const currentTerm = student.currentSemester || 0;
   const isLastTerm = currentTerm >= totalTerms;
 
-  const totalOutstanding = student.financeRecords
-    ?.filter((f: any) => !f.isSnapshot)
-    .reduce((s: number, f: any) => s + parseFloat(f.remaining), 0) ?? 0;
+  const totalOutstanding =
+    student.financeRecords
+      ?.filter((f: any) => !f.isSnapshot)
+      .reduce((s: number, f: any) => s + parseFloat(f.remaining), 0) ?? 0;
   const hasDues = totalOutstanding > 0;
 
   return (

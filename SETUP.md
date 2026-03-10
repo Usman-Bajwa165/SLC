@@ -3,9 +3,11 @@
 ## 🎯 Quick Answer to Your Questions
 
 ### Q1: Where should .env file be?
+
 **Answer:** Keep ONE `.env` file in `/slc` (root directory). The system automatically syncs it to subdirectories.
 
 ### Q2: Should I run Prisma commands from /slc or /slc/apps/api?
+
 **Answer:** Run from `/slc/apps/api` but the `.env` file is now synced there automatically.
 
 ---
@@ -13,6 +15,7 @@
 ## 📁 .env File Management
 
 ### Current Setup (FIXED):
+
 ```
 /slc/.env                    ← MAIN FILE (edit this one)
 /slc/apps/api/.env          ← Auto-synced (don't edit)
@@ -20,6 +23,7 @@
 ```
 
 ### How It Works:
+
 - `npm run dev` automatically runs `npm run sync:env` first
 - This copies `/slc/.env` to both subdirectories
 - If you manually edit `.env`, run: `npm run sync:env`
@@ -74,10 +78,11 @@ npx prisma migrate deploy --schema=../../prisma/schema.prisma
 npx prisma studio --schema=../../prisma/schema.prisma
 
 # Seed database
-npx tsx ../../prisma/seed.ts
+# npx tsx ../../prisma/seed.ts
 ```
 
 ### Why --schema flag?
+
 Because `schema.prisma` is in `/slc/prisma/` not `/slc/apps/api/prisma/`
 
 ---
@@ -86,28 +91,32 @@ Because `schema.prisma` is in `/slc/prisma/` not `/slc/apps/api/prisma/`
 
 ### From `/slc` (root):
 
-| Command | What It Does |
-|---------|-------------|
-| `npm run dev` | Start API + Frontend (auto-syncs .env) |
-| `npm run dev:infra` | Start PostgreSQL, Redis, MinIO only |
-| `npm run sync:env` | Manually sync .env to subdirectories |
-| `npm run stop:infra` | Stop infrastructure containers |
-| `npm run build` | Build API + Frontend for production |
-| `npm run test` | Run API tests |
-| `npm run lint` | Lint API + Frontend |
+| Command              | What It Does                           |
+| -------------------- | -------------------------------------- |
+| `npm run dev`        | Start API + Frontend (auto-syncs .env) |
+| `npm run dev:infra`  | Start PostgreSQL, Redis, MinIO only    |
+| `npm run sync:env`   | Manually sync .env to subdirectories   |
+| `npm run stop:infra` | Stop infrastructure containers         |
+| `npm run build`      | Build API + Frontend for production    |
+| `npm run test`       | Run API tests                          |
+| `npm run lint`       | Lint API + Frontend                    |
 
 ---
 
 ## 🔧 Troubleshooting
 
 ### Error: "Environment variable not found: DATABASE_URL"
+
 **Solution:** Run `npm run sync:env` to copy .env to subdirectories
 
 ### Error: "Can't reach database server at localhost:5432"
+
 **Solution:** Run `npm run dev:infra` to start PostgreSQL
 
 ### Frontend can't connect to API
-**Check:** 
+
+**Check:**
+
 1. API is running on http://localhost:3001
 2. `.env` has `NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1`
 3. Run `npm run sync:env` to update web/.env.local
@@ -118,7 +127,7 @@ Because `schema.prisma` is in `/slc/prisma/` not `/slc/apps/api/prisma/`
 
 ✅ Infrastructure running (PostgreSQL, Redis, MinIO)
 ✅ Database schema created
-✅ Sample data seeded
+✅ Killed tasks on port 3000 and 3001
 ✅ .env sync system configured
 ✅ Ready to develop!
 

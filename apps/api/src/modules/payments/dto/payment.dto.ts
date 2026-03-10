@@ -63,6 +63,9 @@ export class PaymentQueryDto {
   q?: string;
 
   @IsOptional()
+  source?: "student" | "staff" | "all";
+
+  @IsOptional()
   page?: number = 1;
 
   @IsOptional()

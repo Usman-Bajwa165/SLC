@@ -13,6 +13,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { ImportExportModule } from './modules/import-export/import-export.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { StorageModule } from './common/storage/storage.module';
+import { StaffModule } from './modules/staff/staff.module';
 import appConfig from './config/app.config';
 
 @Module({
@@ -34,6 +35,7 @@ import appConfig from './config/app.config';
     DepartmentsModule,
     SessionsModule,
     StudentsModule,
+    StaffModule,
     FinanceModule,
     PaymentsModule,
     AccountsModule,
