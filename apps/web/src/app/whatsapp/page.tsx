@@ -12,13 +12,15 @@ export default function WhatsappPage() {
   const { data: status, isLoading: statusLoading } = useQuery({
     queryKey: ["whatsapp-status"],
     queryFn: whatsappApi.status,
-    refetchInterval: (query) => (query.state.data?.connected ? 10000 : 3000), // Poll faster when waiting for QR scan
+    refetchInterval: (query) => (query.state.data?.connected ? 10000 : 3000),
+    notifyOnChangeProps: ['data', 'error'], // Don't trigger on loading state changes
   });
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ["whatsapp-settings"],
     queryFn: whatsappApi.settings,
     enabled: status?.connected,
+    notifyOnChangeProps: ['data', 'error'],
   });
 
   const logoutMutation = useMutation({
@@ -132,12 +134,22 @@ function SettingsForm({ initialData }: { initialData: any }) {
   const { data: status } = useQuery({
     queryKey: ["whatsapp-status"],
     queryFn: whatsappApi.status,
+    notifyOnChangeProps: ['data', 'error'],
   });
   
   // Prefill with connected number if available and toNumber is default
+  const getFormattedNumber = (num: string) => {
+    if (!num || num === "92 ") return "92 ";
+    const digits = num.replace(/\D/g, "");
+    if (digits.length <= 2) return "92 ";
+    const phoneDigits = digits.substring(2);
+    if (phoneDigits.length <= 3) return `92 ${phoneDigits}`;
+    return `92 ${phoneDigits.substring(0, 3)} ${phoneDigits.substring(3, 10)}`;
+  };
+
   const defaultToNumber = status?.connectedNumber && (!initialData?.toNumber || initialData.toNumber === "92 ")
-    ? `92 ${status.connectedNumber.slice(2)}`
-    : initialData?.toNumber || "92 ";
+    ? getFormattedNumber(`92${status.connectedNumber.slice(2)}`)
+    : getFormattedNumber(initialData?.toNumber || "92 ");
   
   const [formData, setFormData] = useState({
     toNumber: defaultToNumber,
@@ -148,6 +160,16 @@ function SettingsForm({ initialData }: { initialData: any }) {
     notifyEnrollment: initialData?.notifyEnrollment ?? true,
     notifyDeactivation: initialData?.notifyDeactivation ?? true,
   });
+
+  // Update formData when initialData changes
+  useEffect(() => {
+    if (initialData?.toNumber) {
+      setFormData(prev => ({
+        ...prev,
+        toNumber: getFormattedNumber(initialData.toNumber),
+      }));
+    }
+  }, [initialData?.toNumber]);
 
   const mutation = useMutation({
     mutationFn: whatsappApi.updateSettings,

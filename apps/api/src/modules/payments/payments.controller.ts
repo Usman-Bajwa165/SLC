@@ -1,11 +1,13 @@
 import {
-  Controller, Get, Post, Body, Param, Query, ParseIntPipe,
+  Controller, Get, Post, Body, Param, Query, ParseIntPipe, Logger,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto, PaymentQueryDto } from './dto/payment.dto';
 
 @Controller('payments')
 export class PaymentsController {
+  private readonly logger = new Logger(PaymentsController.name);
+
   constructor(private readonly service: PaymentsService) {}
 
   @Get()
@@ -19,8 +21,12 @@ export class PaymentsController {
   }
 
   @Post()
-  create(@Body() dto: CreatePaymentDto) {
-    return this.service.create(dto);
+  async create(@Body() dto: CreatePaymentDto) {
+    this.logger.log('🔵 POST /payments endpoint hit');
+    this.logger.log(`Payment data: ${JSON.stringify(dto)}`);
+    const result = await this.service.create(dto);
+    this.logger.log('✅ Payment created and returned');
+    return result;
   }
 
   @Get(':id/receipt')

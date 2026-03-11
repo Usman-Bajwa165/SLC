@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from "@nestjs/common";
 import { Decimal } from "decimal.js";
 import { InjectQueue } from "@nestjs/bull";
@@ -19,6 +20,8 @@ import {
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
@@ -199,6 +202,7 @@ export class PaymentsService {
   }
 
   async create(dto: CreatePaymentDto) {
+    this.logger.log('=== PAYMENT CREATION STARTED ===');
     const amount = new Decimal(dto.amount);
     if (amount.lte(0))
       throw new BadRequestException("Payment amount must be greater than 0");
@@ -210,12 +214,16 @@ export class PaymentsService {
     if (!student)
       throw new NotFoundException(`Student #${dto.studentId} not found`);
 
+    this.logger.log(`Student found: ${student.name} (${student.registrationNo})`);
+
     // Validate payment method
     const method = await this.prisma.paymentMethod.findUnique({
       where: { id: dto.methodId },
     });
     if (!method)
       throw new NotFoundException(`Payment method #${dto.methodId} not found`);
+
+    this.logger.log(`Payment method: ${method.name}`);
 
     // Validate account if provided
     if (dto.accountId) {
@@ -228,6 +236,7 @@ export class PaymentsService {
 
     // Generate receipt number (atomic via DB sequence)
     const receiptNo = await this.prisma.nextReceiptNo();
+    this.logger.log(`Receipt number generated: ${receiptNo}`);
 
     // === ATOMIC TRANSACTION ===
     const payment = await this.prisma.$transaction(async (tx) => {
@@ -266,6 +275,8 @@ export class PaymentsService {
       return newPayment;
     });
 
+    this.logger.log(`Payment created successfully: ID ${payment.id}`);
+
     // 4. Audit log
     await this.audit.log("payment", payment.id, "payment", null, {
       studentId: dto.studentId,
@@ -288,11 +299,19 @@ export class PaymentsService {
       // Queue unavailable — non-fatal, receipt can be regenerated
     }
 
-    // 6. WhatsApp Notification
-    const dateStr = new Date().toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    const msg = `🎓 *STUDENT PAYMENT RECEIVED*\n\nStudent: ${student.name} (${student.registrationNo})\nAmount: Rs. ${amount.toLocaleString()}\nMethod: ${method.name}\nReceipt: ${receiptNo}\nDate: ${dateStr}`;
-    await this.whatsapp.sendSystemNotification('student', msg);
+    // 6. WhatsApp Notification - Always attempt to send
+    try {
+      const dateStr = new Date().toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const msg = `🎓 *STUDENT PAYMENT RECEIVED*\n\nStudent: ${student.name} (${student.registrationNo})\nAmount: Rs. ${amount.toLocaleString()}\nMethod: ${method.name}\nReceipt: ${receiptNo}\nDate: ${dateStr}`;
+      this.logger.log(`Calling WhatsappService.sendSystemNotification with type: student`);
+      await this.whatsapp.sendSystemNotification('student', msg);
+      this.logger.log('WhatsApp notification call completed successfully');
+    } catch (notificationError) {
+      this.logger.error('ERROR in WhatsApp notification:', notificationError);
+      // Don't throw - notification failure shouldn't fail the payment
+    }
 
+    this.logger.log('=== PAYMENT CREATION COMPLETED ===');
     return this.findOne(payment.id);
   }
 

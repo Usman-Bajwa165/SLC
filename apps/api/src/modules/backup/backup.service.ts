@@ -42,8 +42,6 @@ export class BackupService implements OnModuleInit {
     if (!fs.existsSync(this.backupDir)) {
       fs.mkdirSync(this.backupDir, { recursive: true });
       this.logger.log(`Created backup directory at: ${this.backupDir}`);
-    } else {
-      this.logger.log(`Backup directory verified at: ${this.backupDir}`);
     }
   }
 
@@ -295,10 +293,8 @@ export class BackupService implements OnModuleInit {
         hour: '2-digit', minute: '2-digit'
       });
       
-      await this.whatsapp.sendMessage(
-        settings.toNumber, 
-        `🚨 *SLC SYSTEM BACKUP*\n\nAutomated backup successfully completed on ${dateStr}.\nFiles are safely stored in your system's Documents folder. Sending copies now.`
-      );
+      const msg = `🚨 *SLC SYSTEM BACKUP*\n\nAutomated backup successfully completed on ${dateStr}.\nFiles are safely stored in your system's Documents folder. Sending copies now.`;
+      await this.whatsapp.sendSystemNotification('backup', msg);
 
       for (const file of files) {
         if (fs.existsSync(file)) {

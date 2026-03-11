@@ -1,6 +1,7 @@
 "use client";
-import { Bell, Search, User } from "lucide-react";
+import { Search, User } from "lucide-react";
 import { usePathname } from "next/navigation";
+import NotificationBell from "../NotificationBell";
 
 const titles: Record<string, string> = {
   "/dashboard": "Dashboard Overview",
@@ -43,10 +44,7 @@ export default function TopBar() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button className="p-2.5 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-brand-blue transition-all relative group">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand-gold-light rounded-full border-2 border-white ring-2 ring-transparent group-hover:ring-brand-gold-light/20 transition-all" />
-          </button>
+          <NotificationBell />
 
           <div className="h-6 w-px bg-slate-200" />
 

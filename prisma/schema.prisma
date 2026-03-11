@@ -349,3 +349,18 @@ model WhatsappSettings {
 
   @@map("whatsapp_settings")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// In-app notification system for all WhatsApp messages
+// ─────────────────────────────────────────────────────────────────────────────
+model Notification {
+  id        Int      @id @default(autoincrement())
+  type      String   // 'student'|'staff'|'finance'|'account'|'enrollment'|'deactivation'|'backup'
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}

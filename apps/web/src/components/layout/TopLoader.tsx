@@ -112,7 +112,12 @@ export default function TopLoader() {
 export function GlobalProgressBar() {
   const fetching = useIsFetching();
   const mutating = useIsMutating();
-  const active = fetching + mutating > 0;
+  
+  // Exclude background polling queries from triggering the progress bar
+  const whatsappStatusFetching = useIsFetching({ queryKey: ['whatsapp-status'] });
+  const notificationsFetching = useIsFetching({ queryKey: ['notifications'] });
+  const active = (fetching - whatsappStatusFetching - notificationsFetching) + mutating > 0;
+  
   const prevActive = useRef(false);
 
   useEffect(() => {

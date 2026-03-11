@@ -223,7 +223,8 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
   /**
    * Send a system notification based on settings.
    */
-  async sendSystemNotification(type: 'student' | 'staff' | 'finance' | 'account' | 'enrollment' | 'deactivation', message: string) {
+  async sendSystemNotification(type: 'student' | 'staff' | 'finance' | 'account' | 'enrollment' | 'deactivation' | 'backup', message: string) {
+    this.logger.log(`\n🔔 NOTIFICATION RECEIVED - Type: ${type}`);
     const settings = await this.getSettings();
     let shouldSend = false;
 
@@ -234,10 +235,38 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       case 'account': shouldSend = settings.notifyAccounts; break;
       case 'enrollment': shouldSend = settings.notifyEnrollment; break;
       case 'deactivation': shouldSend = settings.notifyDeactivation; break;
+      case 'backup': shouldSend = true; break; // Always send backup notifications
+    }
+
+    this.logger.log(`Notification check - Type: ${type}, ShouldSend: ${shouldSend}, Connected: ${this.isConnected}, ToNumber: ${settings.toNumber}`);
+
+    // Extract title from message (first line)
+    const title = message.split('\n')[0].replace(/[*_~`]/g, '').trim();
+
+    // Save to database for in-app notifications
+    try {
+      await this.prisma.notification.create({
+        data: {
+          type,
+          title,
+          message,
+          isRead: false,
+        },
+      });
+      this.logger.log(`✅ Notification saved to database - Type: ${type}`);
+    } catch (e) {
+      this.logger.error('Failed to save notification to database:', e);
     }
 
     if (shouldSend && settings.toNumber && settings.toNumber.length > 5) {
-      await this.sendMessage(settings.toNumber, message);
+      const sent = await this.sendMessage(settings.toNumber, message);
+      if (sent) {
+        this.logger.log(`✅ ${type} notification sent to WhatsApp successfully`);
+      } else {
+        this.logger.error(`❌ ${type} notification failed to send to WhatsApp`);
+      }
+    } else {
+      this.logger.warn(`Notification not sent to WhatsApp - ShouldSend: ${shouldSend}, ToNumber valid: ${settings.toNumber && settings.toNumber.length > 5}`);
     }
   }
 }

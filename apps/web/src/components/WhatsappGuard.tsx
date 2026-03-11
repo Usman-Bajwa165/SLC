@@ -19,7 +19,8 @@ export default function WhatsappGuard({
   const { data, isLoading } = useQuery({
     queryKey: ["whatsapp-status"],
     queryFn: whatsappApi.status,
-    refetchInterval: 5000, // Poll every 5s to keep checking status
+    refetchInterval: 5000,
+    notifyOnChangeProps: ['data', 'error'],
   });
 
   useEffect(() => {
@@ -28,10 +29,8 @@ export default function WhatsappGuard({
       if (!data.connected && !isWhatsappRoute) {
         router.push("/whatsapp");
       }
-      // If we ARE connected, and ARE on the whatsapp route -> go to dashboard
-      if (data.connected && isWhatsappRoute) {
-        router.push("/dashboard");
-      }
+      // Don't auto-redirect away from whatsapp page if connected
+      // Let user stay on whatsapp page if they explicitly navigated there
     }
   }, [data, isLoading, isWhatsappRoute, router, pathname]);
 
