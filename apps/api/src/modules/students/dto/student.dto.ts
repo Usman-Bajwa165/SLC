@@ -241,4 +241,7 @@ export class StudentQueryDto {
 
   @IsOptional()
   endDate?: string;
+
+  @IsOptional()
+  currentSemester?: string;
 }

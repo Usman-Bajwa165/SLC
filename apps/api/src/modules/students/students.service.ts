@@ -38,6 +38,7 @@ export class StudentsService {
       q,
       startDate,
       endDate,
+      currentSemester,
     } = query;
     const { skip, take } = paginate(page, limit);
 
@@ -55,6 +56,11 @@ export class StudentsService {
 
     if (status && status !== "all") {
       where.status = status;
+    }
+
+    const sem = currentSemester ? parseInt(currentSemester) : NaN;
+    if (!isNaN(sem)) {
+      where.currentSemester = sem;
     }
 
     if (startDate || endDate) {

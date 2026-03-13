@@ -462,37 +462,49 @@ function OutstandingReport() {
                       </p>
                     </td>
                     <td className="px-6 py-4">
-                      {r.programMode === "semester" ? (
-                        <div className="flex flex-col gap-0.5">
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            CGPA:{" "}
-                            <span className="text-brand-blue">
-                              {r.cgpa ?? 0}
-                            </span>
-                          </p>
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            SGPA:{" "}
-                            <span className="text-slate-600">
-                              {r.sgpa ?? 0}
-                            </span>
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col gap-0.5">
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            OBT:{" "}
-                            <span className="text-brand-blue">
-                              {r.obtainedMarks ?? 0}
-                            </span>
-                          </p>
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            TOT:{" "}
-                            <span className="text-slate-600">
-                              {r.totalMarks ?? 0}
-                            </span>
-                          </p>
-                        </div>
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {(r.cgpa !== null || r.sgpa !== null) && (
+                          <div className="flex flex-col">
+                            {r.cgpa !== null && (
+                              <p className="text-[10px] font-black uppercase text-slate-400">
+                                CGPA:{" "}
+                                <span className="text-brand-blue">
+                                  {r.cgpa}
+                                </span>
+                              </p>
+                            )}
+                            {r.sgpa !== null && (
+                              <p className="text-[10px] font-black uppercase text-slate-400">
+                                SGPA:{" "}
+                                <span className="text-slate-600">
+                                  {r.sgpa}
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {(r.obtainedMarks !== null || r.totalMarks !== null) && (
+                          <div className="flex flex-col">
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              OBT:{" "}
+                              <span className="text-brand-blue">
+                                {r.obtainedMarks ?? 0}
+                              </span>
+                            </p>
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              TOT:{" "}
+                              <span className="text-slate-600">
+                                {r.totalMarks ?? 0}
+                              </span>
+                            </p>
+                          </div>
+                        )}
+                        {r.cgpa === null && r.sgpa === null && r.obtainedMarks === null && r.totalMarks === null && (
+                          <span className="text-[10px] font-bold text-slate-300">
+                            —
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right font-bold text-slate-600 uppercase text-[10px]">
                       PKR {formatCurrency(r.totalPayable)}

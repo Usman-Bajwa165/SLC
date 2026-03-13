@@ -80,6 +80,7 @@ export const studentsApi = {
     endDate?: string;
     page?: number;
     limit?: number;
+    currentSemester?: number;
   }) => get<any>("/students", params),
   get: (id: number) => get<any>(`/students/${id}`),
   create: (dto: any) => post<any>("/students", dto),

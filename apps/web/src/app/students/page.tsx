@@ -38,7 +38,7 @@ export default function StudentsPage() {
   const [dept, setDept] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [currentLevel, setCurrentLevel] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState("active");
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
@@ -139,6 +139,16 @@ export default function StudentsPage() {
     queryFn: () => sessionsApi.list(Number(dept)),
     enabled: !!dept,
   });
+  const { data: sessionData } = useQuery({
+    queryKey: ["students-session", { department: dept, session: sessionId }],
+    queryFn: () =>
+      studentsApi.list({
+        department: dept ? Number(dept) : undefined,
+        session: sessionId ? Number(sessionId) : undefined,
+        limit: 1000,
+      }),
+    enabled: !!dept && !!sessionId,
+  });
 
   const students = data?.data || [];
   const meta = data?.meta;
@@ -238,8 +248,8 @@ export default function StudentsPage() {
   const selectedDept = depts?.find((d: any) => d.id === Number(dept));
   const activeLevels = new Set<number>();
 
-  if (sessionId && students.length > 0) {
-    students.forEach((s: any) => {
+  if (sessionData?.data) {
+    sessionData.data.forEach((s: any) => {
       if (s.currentSemester) {
         activeLevels.add(s.currentSemester);
       }
