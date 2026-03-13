@@ -124,6 +124,25 @@ export class StaffService {
     const salary = new Prisma.Decimal(dto.salary);
     const currentMonth = new Date().toISOString().slice(0, 7);
 
+    // CNIC uniqueness check
+    const existingStaff = await this.prisma.staff.findFirst({
+      where: { cnic: dto.cnic, isDeleted: false },
+    });
+    if (existingStaff) {
+      throw new ConflictException(
+        `Staff member ${existingStaff.name} already has this CNIC: ${dto.cnic}`,
+      );
+    }
+    const existingStudent = await this.prisma.student.findFirst({
+      where: { cnic: dto.cnic, isDeleted: false },
+      include: { department: true },
+    });
+    if (existingStudent) {
+      throw new ConflictException(
+        `Student ${existingStudent.name} from ${existingStudent.department?.code || "N/A"} already has this CNIC: ${dto.cnic}`,
+      );
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       const staff = await tx.staff.create({
         data: {
@@ -162,9 +181,10 @@ export class StaffService {
     await this.audit.log("staff", result.id, "create", null, result);
     
     // Send enrollment notification
+    const subjectLine = result.role === 'teacher' && result.subject ? `\nSubject: ${result.subject}` : '';
     await this.whatsapp.sendSystemNotification(
       'enrollment',
-      `👔 *NEW STAFF HIRED*\n\nName: ${result.name}\nRole: ${dto.role}\nSalary: PKR ${salary.toString()}\nJoined: ${new Date(dto.joinedDate).toLocaleDateString('en-PK')}`
+      `👔 *NEW STAFF HIRED*\n\nName: ${result.name}\nRole: ${result.role.toUpperCase()}${subjectLine}\nSalary: PKR ${new Prisma.Decimal(salary.toString()).toLocaleString()}\nJoined: ${new Date(dto.joinedDate).toLocaleDateString('en-PK')}`
     );
     
     return this.findOne(result.id);
@@ -180,6 +200,26 @@ export class StaffService {
     }
 
     const { version, salary, effectiveMonth, ...updateData } = dto;
+
+    if (dto.cnic && dto.cnic !== existing.cnic) {
+      const duplicateStaff = await this.prisma.staff.findFirst({
+        where: { cnic: dto.cnic, id: { not: id }, isDeleted: false },
+      });
+      if (duplicateStaff) {
+        throw new ConflictException(
+          `Another staff member ${duplicateStaff.name} already has this CNIC: ${dto.cnic}`,
+        );
+      }
+      const duplicateStudent = await this.prisma.student.findFirst({
+        where: { cnic: dto.cnic, isDeleted: false },
+        include: { department: true },
+      });
+      if (duplicateStudent) {
+        throw new ConflictException(
+          `Student ${duplicateStudent.name} from ${duplicateStudent.department?.code || "N/A"} already has this CNIC: ${dto.cnic}`,
+        );
+      }
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.staff.update({

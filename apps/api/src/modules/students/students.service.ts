@@ -134,13 +134,25 @@ export class StudentsService {
     ) => {
       if (!dto[field]) return;
       const existing = await this.prisma.student.findFirst({
-        where: { [field]: dto[field] },
+        where: { [field]: dto[field], isDeleted: false },
         include: { department: true },
       });
       if (existing) {
         throw new ConflictException(
           `Student ${existing.name} from ${existing.department.code || existing.department.name} has same ${label} - ${dto[field]}`,
         );
+      }
+
+      // Cross-entity CNIC check
+      if (field === "cnic") {
+        const existingStaff = await this.prisma.staff.findFirst({
+          where: { cnic: dto.cnic, isDeleted: false },
+        });
+        if (existingStaff) {
+          throw new ConflictException(
+            `Staff member ${existingStaff.name} has same CNIC - ${dto.cnic}`,
+          );
+        }
       }
     };
     await checkUnique("cnic", "cnic");
@@ -322,6 +334,40 @@ export class StudentsService {
       );
     }
 
+    // Uniqueness checks for CNIC, Reg No, Roll No
+    const checkUpdateUnique = async (
+      field: "cnic" | "registrationNo" | "rollNo",
+      label: string,
+    ) => {
+      if (!dto[field] || dto[field] === existing[field]) return;
+
+      const duplicate = await this.prisma.student.findFirst({
+        where: { [field]: dto[field], id: { not: id }, isDeleted: false },
+        include: { department: true },
+      });
+
+      if (duplicate) {
+        throw new ConflictException(
+          `Another student ${duplicate.name} from ${duplicate.department.code || duplicate.department.name} has same ${label} - ${dto[field]}`,
+        );
+      }
+
+      if (field === "cnic") {
+        const existingStaff = await this.prisma.staff.findFirst({
+          where: { cnic: dto.cnic, isDeleted: false },
+        });
+        if (existingStaff) {
+          throw new ConflictException(
+            `Staff member ${existingStaff.name} has same CNIC - ${dto.cnic}`,
+          );
+        }
+      }
+    };
+
+    await checkUpdateUnique("cnic", "cnic");
+    await checkUpdateUnique("registrationNo", "registration no.");
+    await checkUpdateUnique("rollNo", "roll no.");
+
     const {
       version,
       initialFeeAmount,
@@ -333,10 +379,24 @@ export class StudentsService {
       receiverName,
       paymentDate,
       currentSemester,
+      enrolledAt,
       ...updateData
     } = dto;
 
     const advancePaid = _adv ? new Decimal(_adv) : new Decimal(0);
+
+    // Validate Receipt No if payment is made
+    if (advancePaid.greaterThan(0) && receiptNo) {
+      const existingReceipt = await this.prisma.payment.findUnique({
+        where: { receiptNo: receiptNo },
+        include: { student: { include: { department: true } } },
+      });
+      if (existingReceipt) {
+        throw new ConflictException(
+          `A payment with this receipt no. (${receiptNo}) already exists for student ${existingReceipt.student.name} from ${existingReceipt.student.department.code || existingReceipt.student.department.name}`,
+        );
+      }
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       // Handle semester/year change
@@ -373,7 +433,7 @@ export class StudentsService {
                   .minus(currentPaid),
               },
             });
-          } else {
+          } else if (newTerm < oldTerm) {
             // Demoted backward - keep fee, subtract one term fee from remaining
             const newRemaining = currentRemaining.minus(currentFeeDue);
             await tx.studentFinance.update({
@@ -390,7 +450,12 @@ export class StudentsService {
 
       const updated = await tx.student.update({
         where: { id },
-        data: { ...updateData, currentSemester, version: { increment: 1 } },
+        data: {
+          ...updateData,
+          currentSemester,
+          ...(enrolledAt && { enrolledAt: new Date(enrolledAt) }),
+          version: { increment: 1 },
+        },
       });
 
       // Find the active student finance

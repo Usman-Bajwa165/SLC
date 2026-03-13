@@ -149,16 +149,38 @@ export class UpdateStudentDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(50)
+  registrationNo?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(50)
   rollNo?: string;
 
-  @IsEnum(STUDENT_STATUSES)
+  @IsInt()
   @IsOptional()
-  status?: string;
+  departmentId?: number;
+
+  @IsInt()
+  @IsOptional()
+  sessionId?: number;
+
+  @IsEnum(PROGRAM_MODES)
+  @IsOptional()
+  programMode?: string;
 
   @IsInt()
   @Min(1)
   @IsOptional()
   currentSemester?: number;
+
+  @IsDateString()
+  @IsOptional()
+  enrolledAt?: string;
+
+  @IsEnum(STUDENT_STATUSES)
+  @IsOptional()
+  status?: string;
 
   @IsNumber()
   @Min(0)

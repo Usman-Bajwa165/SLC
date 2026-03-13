@@ -163,8 +163,8 @@ export default function EnrollmentPage() {
       ...form,
       name: student.name,
       parentGuardian: student.parentGuardian,
-      cnic: student.cnic,
-      contact: student.contact || "92 ",
+      cnic: formatCNIC(student.cnic),
+      contact: formatContact(student.contact || "92 "),
       registrationNo: student.registrationNo,
       rollNo: student.rollNo || "",
       departmentId: student.departmentId.toString(),
@@ -691,17 +691,19 @@ export default function EnrollmentPage() {
               onChange={(e) => set("rollNo", e.target.value)}
             />
           </div>
-          <div className="md:col-span-2">
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">
-              Enrollment Date
-            </label>
-            <input
-              type="date"
-              className="input-field !py-1.5 !text-sm !text-slate-900 font-bold bg-white"
-              value={form.enrolledAt || ""}
-              onChange={(e) => set("enrolledAt", e.target.value)}
-            />
-          </div>
+          {mode === "new" && (
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">
+                Enrollment Date
+              </label>
+              <input
+                type="date"
+                className="input-field !py-1.5 !text-sm !text-slate-900 font-bold bg-white"
+                value={form.enrolledAt || ""}
+                onChange={(e) => set("enrolledAt", e.target.value)}
+              />
+            </div>
+          )}
           {(form.marksType === "marks" || form.marksType === "both") && (
             <>
               <div>

@@ -103,8 +103,8 @@ export default function StaffPage() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in p-2 max-w-[1600px] mx-auto">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-slate-100">
+    <div className="h-[calc(100vh-100px)] flex flex-col gap-6 animate-fade-in p-2 max-w-[1600px] mx-auto overflow-hidden">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-slate-100 shrink-0">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">
             Staff Management
@@ -180,7 +180,7 @@ export default function StaffPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 py-2">
+      <div className="flex flex-wrap gap-2 shrink-0">
         <button
           onClick={() => setRoleFilter("")}
           className={clsx(
@@ -208,8 +208,8 @@ export default function StaffPage() {
         ))}
       </div>
 
-      <div className="card-premium overflow-hidden border-slate-100 shadow-2xl shadow-slate-200/50">
-        <div className="overflow-x-auto">
+      <div className="card-premium flex-1 overflow-hidden border-slate-100 shadow-2xl shadow-slate-200/50 flex flex-col">
+        <div className="overflow-x-auto overflow-y-auto flex-1 h-full scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 z-10 bg-slate-50/50">
               <tr>
