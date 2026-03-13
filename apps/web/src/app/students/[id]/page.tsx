@@ -190,7 +190,7 @@ export default function StudentDetailPage() {
             <Download className="w-5 h-5" />
           </button>
           <Link
-            href={`/enrollment?tab=existing&studentId=${id}`}
+            href={`/enrollment?tab=existing&studentId=${id}&returnUrl=/students/${id}`}
             className="px-5 py-2.5 border-2 border-slate-200 text-slate-500 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-2"
           >
             <User className="w-4 h-4" /> Edit Student

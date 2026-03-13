@@ -17,6 +17,8 @@ import {
   UserPlus,
   Printer,
   Download,
+  Bell,
+  Send,
 } from "lucide-react";
 import { exportToPDF } from "@/lib/report-utils";
 import Link from "next/link";
@@ -190,6 +192,41 @@ export default function StudentsPage() {
       qc.invalidateQueries({ queryKey: ["students"] });
       setSelectedIds([]);
       toast.success("Students graduated successfully!");
+    },
+    onError: (err: any) => {
+      hideBar();
+      toast.error(err?.message || String(err));
+    },
+  });
+
+  const notifyMutation = useMutation({
+    mutationFn: (id: number) => {
+      showBar();
+      return studentsApi.notify(id);
+    },
+    onSuccess: () => {
+      hideBar();
+      toast.success("Notification sent successfully!");
+    },
+    onError: (err: any) => {
+      hideBar();
+      toast.error(err?.message || String(err));
+    },
+  });
+
+  const notifyAllMutation = useMutation({
+    mutationFn: async (studentIds: number[]) => {
+      showBar();
+      return studentsApi.notifyAll(studentIds);
+    },
+    onSuccess: (result: any) => {
+      hideBar();
+      if (result.success > 0) {
+        toast.success(`Sent ${result.success} notifications successfully!`);
+      }
+      if (result.failed > 0) {
+        toast.error(`Failed to send ${result.failed} notifications. ${result.errors.slice(0, 3).join(', ')}`);
+      }
     },
     onError: (err: any) => {
       hideBar();
@@ -391,6 +428,33 @@ export default function StudentsPage() {
               })()}
             </>
           )}
+          {(() => {
+            const studentsWithDues = students.filter((s: any) => {
+              const outstanding =
+                s.financeRecords?.reduce(
+                  (sum: number, f: any) => sum + parseFloat(f.remaining || 0),
+                  0,
+                ) ?? 0;
+              return outstanding > 0;
+            });
+            
+            if (studentsWithDues.length > 0) {
+              return (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Send fee reminder to ${studentsWithDues.length} students with outstanding dues?`)) {
+                      notifyAllMutation.mutate(studentsWithDues.map((s: any) => s.id));
+                    }
+                  }}
+                  className="btn-secondary flex items-center gap-2 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                  title="Notify all students with outstanding dues"
+                >
+                  <Bell className="w-4 h-4" /> Notify All ({studentsWithDues.length})
+                </button>
+              );
+            }
+            return null;
+          })()}
           <button
             onClick={handlePrint}
             className="btn-secondary flex items-center gap-2"
@@ -805,6 +869,20 @@ export default function StudentsPage() {
                       </td>
                       <td className="px-6 py-5 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {outstanding > 0 && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Send fee reminder to ${s.name}?`)) {
+                                  notifyMutation.mutate(s.id);
+                                }
+                              }}
+                              disabled={notifyMutation.isPending}
+                              className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                              title="Send Fee Reminder"
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+                          )}
                           {s.status === "active" && !isFinalTerm && (
                             <button
                               onClick={() => {

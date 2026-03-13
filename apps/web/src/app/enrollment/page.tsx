@@ -314,6 +314,14 @@ export default function EnrollmentPage() {
           ? "Student enrolled successfully!"
           : "Student updated successfully!",
       );
+      
+      // Check if there's a returnUrl to navigate back
+      const returnUrl = searchParams.get("returnUrl");
+      if (returnUrl) {
+        routerEnroll.push(returnUrl);
+        return;
+      }
+      
       // Reset ALL fields
       setForm({ ...defaultForm });
       setSelectedExistingId(null);

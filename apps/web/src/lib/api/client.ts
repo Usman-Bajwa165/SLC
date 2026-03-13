@@ -87,6 +87,8 @@ export const studentsApi = {
   promote: (id: number) => post<any>(`/students/${id}/promote`, {}),
   delete: (id: number) => del<any>(`/students/${id}`),
   finance: (id: number) => get<any>(`/students/${id}/finance`),
+  notify: (id: number) => post<any>(`/students/${id}/notify`, {}),
+  notifyAll: (studentIds: number[]) => post<any>("/students/notify-all", { studentIds }),
 };
 
 // ── Payments ──────────────────────────────────────────────────────────────────

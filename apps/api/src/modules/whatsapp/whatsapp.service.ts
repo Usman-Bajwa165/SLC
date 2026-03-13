@@ -234,7 +234,6 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
    * Send a system notification based on settings.
    */
   async sendSystemNotification(type: 'student' | 'staff' | 'finance' | 'account' | 'enrollment' | 'deactivation' | 'backup', message: string) {
-    this.logger.log(`\n🔔 NOTIFICATION RECEIVED - Type: ${type}`);
     const settings = await this.getSettings();
     let shouldSend = false;
 
@@ -245,10 +244,8 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       case 'account': shouldSend = settings.notifyAccounts; break;
       case 'enrollment': shouldSend = settings.notifyEnrollment; break;
       case 'deactivation': shouldSend = settings.notifyDeactivation; break;
-      case 'backup': shouldSend = true; break; // Always send backup notifications
+      case 'backup': shouldSend = true; break;
     }
-
-    this.logger.log(`Notification check - Type: ${type}, ShouldSend: ${shouldSend}, Connected: ${this.isConnected}, ToNumber: ${settings.toNumber}`);
 
     // Extract title from message (first line)
     const title = message.split('\n')[0].replace(/[*_~`]/g, '').trim();
@@ -263,28 +260,20 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
           isRead: false,
         },
       });
-      this.logger.log(`✅ Notification saved to database - Type: ${type}`);
     } catch (e) {
-      this.logger.error('Failed to save notification to database:', e);
+      this.logger.error('Failed to save notification to database:', e.message);
     }
 
     // Queue WhatsApp message if should send
     if (shouldSend && settings.toNumber && settings.toNumber.length > 5) {
       if (this.isConnected) {
-        // Send immediately if connected
         const sent = await this.sendMessage(settings.toNumber, message);
-        if (sent) {
-          this.logger.log(`✅ ${type} notification sent to WhatsApp successfully`);
-        } else {
-          this.logger.error(`❌ ${type} notification failed to send to WhatsApp`);
+        if (!sent) {
+          this.logger.warn(`Failed to send ${type} notification to WhatsApp`);
         }
       } else {
-        // Queue for later if not connected
         this.pendingNotifications.push({ type, message });
-        this.logger.log(`📥 ${type} notification queued (WhatsApp not connected yet)`);
       }
-    } else {
-      this.logger.warn(`Notification not sent to WhatsApp - ShouldSend: ${shouldSend}, ToNumber valid: ${settings.toNumber && settings.toNumber.length > 5}`);
     }
   }
 
@@ -296,19 +285,12 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.logger.log(`📤 Processing ${this.pendingNotifications.length} pending notifications...`);
     const settings = await this.getSettings();
     
     while (this.pendingNotifications.length > 0) {
       const notification = this.pendingNotifications.shift();
       if (notification && settings.toNumber) {
-        const sent = await this.sendMessage(settings.toNumber, notification.message);
-        if (sent) {
-          this.logger.log(`✅ Queued ${notification.type} notification sent successfully`);
-        } else {
-          this.logger.error(`❌ Queued ${notification.type} notification failed`);
-        }
-        // Small delay between messages
+        await this.sendMessage(settings.toNumber, notification.message);
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }

@@ -243,6 +243,7 @@ export class StudentsService {
       });
 
       // Process payment if advance was paid
+      let paymentCreated = null;
       if (advancePaid.greaterThan(0) && paymentMethodId && receiptNo) {
         const payment = await tx.payment.create({
           data: {
@@ -261,6 +262,7 @@ export class StudentsService {
                 : "Enrollment Advance",
           },
         });
+        paymentCreated = payment;
 
         // Allocate payment to finance term
         await tx.paymentAllocation.create({
@@ -280,18 +282,28 @@ export class StudentsService {
         }
       }
 
-      return student;
+      return { student, payment: paymentCreated };
     });
 
-    await this.audit.log("student", result.id, "create", null, result);
+    await this.audit.log("student", result.student.id, "create", null, result.student);
     
     // Send enrollment notification
     await this.whatsapp.sendSystemNotification(
       'enrollment',
-      `📚 *NEW STUDENT ENROLLED*\n\nName: ${result.name}\nReg No: ${result.registrationNo}\nDepartment: ${dept.name}\nProgram: ${dto.programMode}\nFee Due: PKR ${feeDue.toString()}\nAdvance Paid: PKR ${advancePaid.toString()}\nRemaining: PKR ${remaining.toString()}`
+      `📚 *NEW STUDENT ENROLLED*\n\nName: ${result.student.name}\nReg No: ${result.student.registrationNo}\nDepartment: ${dept.name}\nProgram: ${dto.programMode}\nFee Due: Rs. ${feeDue.toLocaleString()}\nAdvance Paid: Rs. ${advancePaid.toLocaleString()}\nRemaining: Rs. ${remaining.toLocaleString()}`
     );
     
-    return this.findOne(result.id);
+    // Send student fee payment notification if payment was made
+    if (result.payment && advancePaid.greaterThan(0)) {
+      const method = await this.prisma.paymentMethod.findUnique({ where: { id: paymentMethodId } });
+      const dateStr = new Date().toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      await this.whatsapp.sendSystemNotification(
+        'student',
+        `🎓 *STUDENT PAYMENT RECEIVED*\n\nStudent: ${result.student.name} (${result.student.registrationNo})\nAmount: Rs. ${advancePaid.toLocaleString()}\nMethod: ${method?.name || 'N/A'}\nReceipt: ${receiptNo}\nDate: ${dateStr}`
+      );
+    }
+    
+    return this.findOne(result.student.id);
   }
 
   async update(id: number, dto: UpdateStudentDto) {
@@ -403,6 +415,7 @@ export class StudentsService {
 
       // If there is an advance payment provided during update,
       // log it against the student's active StudentFinance record.
+      let paymentCreated = null;
       if (advancePaid.greaterThan(0)) {
         if (!paymentMethodId) {
           throw new BadRequestException(
@@ -438,6 +451,7 @@ export class StudentsService {
                 : "Payment from Profile Update",
           },
         });
+        paymentCreated = payment;
 
         // Update the finance record by applying the payment
         await tx.studentFinance.update({
@@ -466,11 +480,22 @@ export class StudentsService {
         }
       }
 
-      return updated;
+      return { updated, payment: paymentCreated };
     });
 
-    await this.audit.log("student", id, "update", existing, result);
-    return result;
+    await this.audit.log("student", id, "update", existing, result.updated);
+    
+    // Send student fee payment notification if payment was made
+    if (result.payment && advancePaid.greaterThan(0)) {
+      const method = await this.prisma.paymentMethod.findUnique({ where: { id: paymentMethodId } });
+      const dateStr = new Date().toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      await this.whatsapp.sendSystemNotification(
+        'student',
+        `🎓 *STUDENT PAYMENT RECEIVED*\n\nStudent: ${existing.name} (${existing.registrationNo})\nAmount: Rs. ${advancePaid.toLocaleString()}\nMethod: ${method?.name || 'N/A'}\nReceipt: ${receiptNo}\nDate: ${dateStr}`
+      );
+    }
+    
+    return result.updated;
   }
 
   async remove(id: number) {
@@ -632,5 +657,104 @@ export class StudentsService {
       return `${year}-Sem-${semester || 1}`;
     }
     return `${year}-Annual`;
+  }
+
+  async notifyStudent(id: number) {
+    const student = await this.findOne(id);
+    
+    // Calculate outstanding
+    const activeFinance = await this.prisma.studentFinance.findMany({
+      where: { studentId: id, isSnapshot: false },
+    });
+
+    const outstanding = activeFinance.reduce(
+      (sum, f) => sum.plus(new Decimal(f.remaining.toString())),
+      new Decimal(0),
+    );
+
+    if (outstanding.lte(0)) {
+      throw new BadRequestException('Student has no outstanding dues');
+    }
+
+    if (!student.contact || student.contact.length < 10) {
+      throw new BadRequestException('Student has no valid contact number');
+    }
+
+    // Send WhatsApp message directly to student
+    const message = `🎓 *FEE REMINDER - STARS LAW COLLEGE*\n\nDear ${student.name},\n\nThis is a reminder regarding your outstanding fee dues.\n\n📋 Details:\nReg No: ${student.registrationNo}\nDepartment: ${student.department.name}\nOutstanding Amount: Rs. ${outstanding.toLocaleString()}\n\n⚠️ Please clear your dues at the earliest to avoid any inconvenience.\n\nThank you!`;
+    
+    const sent = await this.whatsapp.sendMessage(student.contact, message);
+    
+    if (!sent) {
+      throw new BadRequestException('Failed to send WhatsApp message. Please check if WhatsApp is connected.');
+    }
+
+    return { success: true, message: 'Notification sent successfully' };
+  }
+
+  async notifyAll(studentIds: number[]) {
+    if (!studentIds || studentIds.length === 0) {
+      throw new BadRequestException('No students selected');
+    }
+
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as string[],
+    };
+
+    for (const id of studentIds) {
+      try {
+        const student = await this.prisma.student.findFirst({
+          where: { id, isDeleted: false },
+          include: {
+            department: true,
+            financeRecords: { where: { isSnapshot: false } },
+          },
+        });
+
+        if (!student) {
+          results.failed++;
+          results.errors.push(`Student #${id} not found`);
+          continue;
+        }
+
+        const outstanding = student.financeRecords.reduce(
+          (sum, f) => sum.plus(new Decimal(f.remaining.toString())),
+          new Decimal(0),
+        );
+
+        if (outstanding.lte(0)) {
+          results.failed++;
+          results.errors.push(`${student.name}: No outstanding dues`);
+          continue;
+        }
+
+        if (!student.contact || student.contact.length < 10) {
+          results.failed++;
+          results.errors.push(`${student.name}: No valid contact number`);
+          continue;
+        }
+
+        const message = `🎓 *FEE REMINDER - STARS LAW COLLEGE*\n\nDear ${student.name},\n\nThis is a reminder regarding your outstanding fee dues.\n\n📋 Details:\nReg No: ${student.registrationNo}\nDepartment: ${student.department.name}\nOutstanding Amount: Rs. ${outstanding.toLocaleString()}\n\n⚠️ Please clear your dues at the earliest to avoid any inconvenience.\n\nThank you!`;
+        
+        const sent = await this.whatsapp.sendMessage(student.contact, message);
+        
+        if (sent) {
+          results.success++;
+        } else {
+          results.failed++;
+          results.errors.push(`${student.name}: Failed to send message`);
+        }
+
+        // Small delay between messages
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        results.failed++;
+        results.errors.push(`Student #${id}: ${error.message}`);
+      }
+    }
+
+    return results;
   }
 }

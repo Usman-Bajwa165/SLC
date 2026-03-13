@@ -54,4 +54,14 @@ export class StudentsController {
   promote(@Param('id', ParseIntPipe) id: number) {
     return this.service.promote(id);
   }
+
+  @Post(':id/notify')
+  notifyStudent(@Param('id', ParseIntPipe) id: number) {
+    return this.service.notifyStudent(id);
+  }
+
+  @Post('notify-all')
+  notifyAll(@Body() dto: { studentIds: number[] }) {
+    return this.service.notifyAll(dto.studentIds);
+  }
 }
