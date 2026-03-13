@@ -62,4 +62,9 @@ export class AccountsController {
   ) {
     return this.service.getAccountLedger(id, from, to);
   }
+
+  @Post("cash/adjust")
+  adjustCashBalance(@Body() dto: { currentBalance: number }) {
+    return this.service.adjustCashBalance(dto.currentBalance);
+  }
 }

@@ -308,13 +308,19 @@ function ManageAccountModal({
   account: any;
 }) {
   const qc = useQueryClient();
+  const isCash = account.isCash || false;
+  const previousBalance = Number(account.currentBalance || 0);
   const [form, setForm] = useState({
     label: account.label || "",
     accountNumber: account.accountNumber || "",
     branch: account.branch || "",
     paymentMethodId: account.paymentMethodId || account.paymentMethod?.id,
-    currentBalance: account.currentBalance || 0,
+    currentBalance: previousBalance,
   });
+
+  const balanceChange = Number(form.currentBalance) - previousBalance;
+  const isIncrease = balanceChange > 0;
+  const isDecrease = balanceChange < 0;
 
   const { data: methods } = useQuery({
     queryKey: ["payment-methods"],
@@ -322,13 +328,22 @@ function ManageAccountModal({
   });
 
   const updateMutation = useMutation({
-    mutationFn: (dto: any) => accountsApi.updateAccount(account.id, dto),
+    mutationFn: async (dto: any) => {
+      if (isCash) {
+        // For cash, we just update the balance via a special endpoint
+        return await accountsApi.updateCashBalance(dto.currentBalance);
+      }
+      return await accountsApi.updateAccount(account.id, dto);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["accounts"] });
-      toast.success("Account updated successfully");
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success(isCash ? "Cash balance updated successfully!" : "Account updated successfully");
       onClose();
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to update');
+    },
   });
 
   const deleteMutation = useMutation({
@@ -351,49 +366,68 @@ function ManageAccountModal({
       subtitle={`Editing ${account.label}`}
       icon={Building2}
       iconColor="text-brand-blue"
+      maxWidth="max-w-3xl"
       footer={
         <div className="flex gap-3 w-full">
-          <button
-            onClick={() => {
-              if (Number(form.currentBalance) !== 0) {
-                toast.error("Account must have balance 0 to be deleted");
-                return;
-              }
-              if (
-                window.confirm(
-                  "CRITICAL: This will soft-delete the account. Continue?",
-                )
-              ) {
-                deleteMutation.mutate();
-              }
-            }}
-            disabled={deleteMutation.isPending}
-            className="p-3.5 rounded-xl border-2 border-red-100 text-red-500 hover:bg-red-50 hover:border-red-200 transition-all flex items-center justify-center group"
-            title="Delete Account"
-          >
-            <Trash2 className="w-5 h-5 group-hover:scale-110 group-hover:rotate-6 transition-transform" />
-          </button>
+          {!isCash && (
+            <button
+              onClick={() => {
+                if (Number(form.currentBalance) !== 0) {
+                  toast.error("Account must have balance 0 to be deleted");
+                  return;
+                }
+                if (
+                  window.confirm(
+                    "CRITICAL: This will soft-delete the account. Continue?",
+                  )
+                ) {
+                  deleteMutation.mutate();
+                }
+              }}
+              disabled={deleteMutation.isPending}
+              className="p-3.5 rounded-xl border-2 border-red-100 text-red-500 hover:bg-red-50 hover:border-red-200 transition-all flex items-center justify-center group"
+              title="Delete Account"
+            >
+              <Trash2 className="w-5 h-5 group-hover:scale-110 group-hover:rotate-6 transition-transform" />
+            </button>
+          )}
           <button onClick={onClose} className="btn-secondary px-6">
             Cancel
           </button>
           <button
             className="btn-primary flex-1 shadow-lg shadow-brand-blue/20"
-            disabled={updateMutation.isPending || !form.label}
+            disabled={updateMutation.isPending || (!isCash && !form.label)}
             onClick={() => updateMutation.mutate(form)}
           >
-            {updateMutation.isPending ? "Saving..." : "Update Account"}
+            {updateMutation.isPending ? "Saving..." : isCash ? "Update Cash Balance" : "Update Account"}
           </button>
         </div>
       }
     >
       <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div className="p-4 bg-slate-50 rounded-3xl border border-slate-100 text-center flex flex-col justify-center">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-              Current Balance
+              Previous Balance
             </p>
             <p className="text-xl font-black text-slate-900">
-              PKR {formatCurrency(Number(form.currentBalance))}
+              PKR {formatCurrency(previousBalance)}
+            </p>
+          </div>
+          <div className={clsx(
+            "p-4 rounded-3xl border text-center flex flex-col justify-center",
+            balanceChange === 0 ? "bg-slate-50 border-slate-100" :
+            isIncrease ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+          )}>
+            <p className="text-[10px] font-black uppercase tracking-widest mb-1"
+               style={{ color: balanceChange === 0 ? "#94a3b8" : isIncrease ? "#16a34a" : "#dc2626" }}>
+              {balanceChange === 0 ? "No Change" : isIncrease ? "Increase" : "Decrease"}
+            </p>
+            <p className={clsx(
+              "text-xl font-black",
+              balanceChange === 0 ? "text-slate-400" : isIncrease ? "text-green-600" : "text-red-600"
+            )}>
+              {balanceChange === 0 ? "—" : `${isIncrease ? "+" : "-"} PKR ${formatCurrency(Math.abs(balanceChange))}`}
             </p>
           </div>
           <div className="p-4 bg-brand-blue/5 rounded-3xl border border-brand-blue/10 text-center flex flex-col justify-center">
@@ -401,89 +435,99 @@ function ManageAccountModal({
               Status
             </p>
             <span className="text-xs font-black uppercase text-brand-blue">
-              Active Channel
+              {isCash ? "Cash Account" : "Active Channel"}
             </span>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2 px-1">
-              Account Category (Type) *
-            </label>
-            <select
-              className="input-field bg-white shadow-sm border-slate-200 text-xs font-bold"
-              value={form.paymentMethodId}
-              onChange={(e) =>
-                setForm({ ...form, paymentMethodId: Number(e.target.value) })
-              }
-            >
-              <option value="">Select Category</option>
-              {methods
-                ?.filter((m: any) => m.type !== "cash")
-                .map((m: any) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name} ({m.type.toUpperCase()})
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2 px-1">
-              Display Label *
-            </label>
-            <input
-              className="input-field !text-slate-900 font-bold bg-white"
-              value={form.label}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, label: e.target.value }))
-              }
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        {!isCash && (
+          <div className="space-y-4">
             <div>
               <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2 px-1">
-                Account Number
+                Account Category (Type) *
+              </label>
+              <select
+                className="input-field bg-white shadow-sm border-slate-200 text-xs font-bold"
+                value={form.paymentMethodId}
+                onChange={(e) =>
+                  setForm({ ...form, paymentMethodId: Number(e.target.value) })
+                }
+              >
+                <option value="">Select Category</option>
+                {methods
+                  ?.filter((m: any) => m.type !== "cash")
+                  .map((m: any) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.type.toUpperCase()})
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2 px-1">
+                Display Label *
               </label>
               <input
                 className="input-field !text-slate-900 font-bold bg-white"
-                value={form.accountNumber}
+                value={form.label}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, accountNumber: e.target.value }))
+                  setForm((f) => ({ ...f, label: e.target.value }))
                 }
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2 px-1">
-                Branch
-              </label>
-              <input
-                className="input-field !text-slate-900 font-bold bg-white"
-                value={form.branch}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, branch: e.target.value }))
-                }
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2 px-1">
+                  Account Number
+                </label>
+                <input
+                  className="input-field !text-slate-900 font-bold bg-white"
+                  value={form.accountNumber}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, accountNumber: e.target.value }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2 px-1">
+                  Branch
+                </label>
+                <input
+                  className="input-field !text-slate-900 font-bold bg-white"
+                  value={form.branch}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, branch: e.target.value }))
+                  }
+                />
+              </div>
             </div>
           </div>
-          <div>
-            <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2 px-1">
-              Current Balance (PKR)
-            </label>
-            <input
-              type="number"
-              className="input-field !text-slate-900 font-bold bg-white"
-              value={form.currentBalance}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  currentBalance: Number(e.target.value),
-                }))
-              }
-            />
-          </div>
+        )}
+        <div>
+          <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2 px-1">
+            {isCash ? "New Cash Balance (PKR)" : "New Balance (PKR)"}
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            className="input-field !text-slate-900 font-bold bg-white text-lg"
+            value={form.currentBalance}
+            onChange={(e) => {
+              const newValue = e.target.value === '' ? 0 : Number(e.target.value);
+              setForm((f) => ({
+                ...f,
+                currentBalance: newValue,
+              }));
+            }}
+            onFocus={(e) => e.target.select()}
+          />
+          {isCash && (
+            <p className="text-xs text-amber-600 mt-2 font-medium">
+              Adjusting cash balance will create a balance adjustment transaction.
+            </p>
+          )}
         </div>
       </div>
     </Modal>
@@ -496,12 +540,13 @@ export default function AccountsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const initialTab = (searchParams.get("tab") || "all") as
     | "all"
+    | "cash"
     | "bank"
     | "online";
-  const [activeTab, setActiveTabState] = useState<"all" | "bank" | "online">(
+  const [activeTab, setActiveTabState] = useState<"all" | "cash" | "bank" | "online">(
     initialTab,
   );
-  const setActiveTab = (t: "all" | "bank" | "online") => {
+  const setActiveTab = (t: "all" | "cash" | "bank" | "online") => {
     showBar();
     setActiveTabState(t);
     const params = new URLSearchParams(searchParams.toString());
@@ -543,6 +588,7 @@ export default function AccountsPage() {
 
   const filteredAccounts = accounts.filter((acc: any) => {
     if (activeTab === "all") return true;
+    if (activeTab === "cash") return false; // Cash is handled separately
     return acc.paymentMethod?.type === activeTab;
   });
 
@@ -629,7 +675,7 @@ export default function AccountsPage() {
 
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex bg-slate-100 p-1 rounded-2xl gap-1">
-            {["all", "bank", "online"].map((t) => (
+            {["all", "cash", "bank", "online"].map((t) => (
               <button
                 key={t}
                 onClick={() => setActiveTab(t as any)}
@@ -644,18 +690,89 @@ export default function AccountsPage() {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="btn-primary flex items-center gap-2 group w-full md:w-auto px-8 py-3.5 shadow-lg shadow-brand-blue/20"
-          >
-            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />{" "}
-            Add New Account
-          </button>
+          {activeTab !== "cash" && (
+            <button
+              onClick={() => setShowAdd(true)}
+              className="btn-primary flex items-center gap-2 group w-full md:w-auto px-8 py-3.5 shadow-lg shadow-brand-blue/20"
+            >
+              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />{" "}
+              Add New Account
+            </button>
+          )}
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 max-w-[1600px] mx-auto w-full">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
+        {/* Cash Card - Always show in 'all' or 'cash' tab */}
+        {(activeTab === "all" || activeTab === "cash") && (
+          <div className="card-premium p-6 group hover:scale-[1.02] transition-all duration-300 flex flex-col h-full bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200 shadow-sm">
+            <div className="flex justify-between items-start mb-6">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-inner bg-amber-100 text-amber-600 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-amber-600/30">
+                <Wallet className="w-7 h-7" />
+              </div>
+              <div className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-green-50 text-green-600">
+                Active
+              </div>
+            </div>
+
+            <div className="flex-1">
+              <h3 className="text-xl font-black text-slate-800 tracking-tight leading-tight group-hover:text-amber-600 transition-colors">
+                Cash in Hand
+              </h3>
+              <p className="text-xs font-bold text-amber-600 mt-1 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                Direct Cash Transactions
+              </p>
+              <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mt-1">
+                Non-Account Based
+              </p>
+
+              <div className="mt-8">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-0.5">
+                  Current Balance
+                </p>
+                <p className="text-3xl font-black text-slate-900 tracking-tighter">
+                  <span className="text-sm font-bold text-amber-400 mr-1.5 uppercase">
+                    PKR
+                  </span>
+                  {formatCurrency(cashBalance)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-amber-200 flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-amber-600 text-[10px] font-black uppercase tracking-widest">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Protected
+              </div>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => {
+                    // Open manage cash modal
+                    setManageAccount({ 
+                      id: 0, 
+                      label: 'Cash in Hand', 
+                      currentBalance: cashBalance,
+                      isCash: true 
+                    });
+                  }}
+                  className="text-[10px] font-black text-amber-600 uppercase tracking-widest hover:text-amber-700 transition-colors flex items-center gap-1"
+                >
+                  Manage
+                </button>
+                <button
+                  onClick={() => router.push('/reports/cash-ledger')}
+                  className="text-[10px] font-black text-amber-600 uppercase tracking-widest hover:text-amber-700 transition-colors flex items-center gap-1 group/btn"
+                >
+                  Ledger
+                  <History className="w-3 h-3 group-hover/btn:rotate-12 transition-transform" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {filteredAccounts.map((acc: any) => {
           const type = acc.paymentMethod?.type || "cash";
           const isBank = type === "bank";
@@ -742,22 +859,24 @@ export default function AccountsPage() {
           );
         })}
 
-        <button
-          onClick={() => setShowAdd(true)}
-          className="border-2 border-dashed border-slate-200 rounded-[2rem] p-8 flex flex-col items-center justify-center gap-4 hover:border-brand-gold hover:bg-brand-gold/5 transition-all group min-h-[300px]"
-        >
-          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 group-hover:bg-brand-gold group-hover:text-white transition-all shadow-sm">
-            <Plus className="w-8 h-8" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-black text-slate-400 group-hover:text-brand-gold uppercase tracking-[0.2em]">
-              Add Account
-            </p>
-            <p className="text-[10px] font-bold text-slate-300 uppercase mt-1">
-              New payment channel
-            </p>
-          </div>
-        </button>
+        {activeTab !== "cash" && (
+          <button
+            onClick={() => setShowAdd(true)}
+            className="border-2 border-dashed border-slate-200 rounded-[2rem] p-8 flex flex-col items-center justify-center gap-4 hover:border-brand-gold hover:bg-brand-gold/5 transition-all group min-h-[300px]"
+          >
+            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 group-hover:bg-brand-gold group-hover:text-white transition-all shadow-sm">
+              <Plus className="w-8 h-8" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-black text-slate-400 group-hover:text-brand-gold uppercase tracking-[0.2em]">
+                Add Account
+              </p>
+              <p className="text-[10px] font-bold text-slate-300 uppercase mt-1">
+                New payment channel
+              </p>
+            </div>
+          </button>
+        )}
         </div>
       </div>
     </div>

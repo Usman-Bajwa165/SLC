@@ -105,6 +105,7 @@ export const accountsApi = {
   getAccount: (id: number) => get<any>(`/accounts/${id}`),
   createAccount: (dto: any) => post<any>("/accounts", dto),
   updateAccount: (id: number, dto: any) => put<any>(`/accounts/${id}`, dto),
+  updateCashBalance: (newBalance: number) => post<any>("/cash/adjust", { currentBalance: newBalance }),
   deleteAccount: (id: number) => del<any>(`/accounts/${id}`),
   ledger: (id: number, from?: string, to?: string) =>
     get<any>(`/accounts/${id}/ledger`, { from, to }),
@@ -131,6 +132,8 @@ export const reportsApi = {
     get<any>(`/reports/student-ledger/${id}`, { from, to }),
   accountLedger: (id: number, from?: string, to?: string, type?: string) =>
     get<any>(`/reports/account-ledger/${id}`, { from, to, type }),
+  cashLedger: (from?: string, to?: string, type?: string) =>
+    get<any>("/reports/cash-ledger", { from, to, type }),
   staffLedger: (id: number, from?: string, to?: string) =>
     get<any>(`/reports/staff-ledger/${id}`, { from, to }),
   advanceSummary: (params?: any) =>

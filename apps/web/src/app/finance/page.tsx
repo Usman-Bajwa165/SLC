@@ -51,6 +51,8 @@ export default function FinancePage() {
     dateFrom: "",
     dateTo: "",
     categories: [] as string[],
+    paymentMethodType: "",
+    accountId: "",
   });
 
   const { data: allTransactions, isLoading } = useQuery({
@@ -110,12 +112,32 @@ export default function FinancePage() {
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
 
-  // Filter by categories and date range on frontend
+  // Get accounts list for filtering
+  const accountsList = (accounts as any)?.data || accounts || [];
+
+  // Filter by categories, date range, payment method type, and specific account
   let filteredTransactions = allRecords;
 
   if (filters.categories.length > 0) {
     filteredTransactions = filteredTransactions.filter((t: any) =>
       filters.categories.includes(t.category),
+    );
+  }
+
+  if (filters.paymentMethodType) {
+    filteredTransactions = filteredTransactions.filter((t: any) => {
+      if (filters.paymentMethodType === "cash") return !t.accountId;
+      if (t.accountId) {
+        const acc = accountsList.find((a: any) => a.id === t.accountId);
+        return acc?.paymentMethod?.type === filters.paymentMethodType;
+      }
+      return false;
+    });
+  }
+
+  if (filters.accountId) {
+    filteredTransactions = filteredTransactions.filter((t: any) => 
+      t.accountId === Number(filters.accountId)
     );
   }
 
@@ -127,7 +149,7 @@ export default function FinancePage() {
 
   if (filters.dateTo) {
     filteredTransactions = filteredTransactions.filter(
-      (t: any) => new Date(t.date) <= new Date(filters.dateTo),
+      (t: any) => new Date(t.date) <= new Date(filters.dateTo + "T23:59:59"),
     );
   }
 
@@ -139,8 +161,6 @@ export default function FinancePage() {
   );
 
   // Calculate totals by payment method type from filtered records
-  const accountsList = (accounts as any)?.data || accounts || [];
-
   const cashTotal = filteredTransactions
     .filter((t: any) => !t.accountId)
     .reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0);
@@ -313,13 +333,13 @@ export default function FinancePage() {
 
       {/* Filters + Table */}
       <div className="card-premium bg-white p-6 overflow-hidden flex flex-col h-[calc(100vh-12rem)]">
-        <div className="flex flex-wrap items-end gap-3 mb-6 flex-shrink-0">
+        <div className="flex items-center gap-2 mb-6 flex-shrink-0 overflow-x-auto pb-2">
           {/* Date Range */}
-          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100">
-            <Calendar className="w-4 h-4 text-slate-400 ml-1 flex-shrink-0" />
+          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 flex-shrink-0">
+            <Calendar className="w-4 h-4 text-slate-400 ml-1" />
             <input
               type="date"
-              className="bg-transparent border-none text-xs font-bold focus:ring-0 text-slate-600"
+              className="bg-transparent border-none text-xs font-bold focus:ring-0 text-slate-600 w-28"
               value={filters.dateFrom}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, dateFrom: e.target.value }))
@@ -328,7 +348,7 @@ export default function FinancePage() {
             <span className="text-slate-300 font-black">→</span>
             <input
               type="date"
-              className="bg-transparent border-none text-xs font-bold focus:ring-0 text-slate-600"
+              className="bg-transparent border-none text-xs font-bold focus:ring-0 text-slate-600 w-28"
               value={filters.dateTo}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, dateTo: e.target.value }))
@@ -336,12 +356,46 @@ export default function FinancePage() {
             />
           </div>
 
+          {/* Payment Method Type Dropdown */}
+          <select
+            className="input-field !py-2 !px-3 text-xs font-bold bg-white shadow-sm border-slate-200 w-[110px] flex-shrink-0"
+            value={filters.paymentMethodType}
+            onChange={(e) =>
+              setFilters((f) => ({ ...f, paymentMethodType: e.target.value, accountId: "" }))
+            }
+          >
+            <option value="">All Methods</option>
+            <option value="cash">Cash</option>
+            <option value="bank">Bank</option>
+            <option value="online">Online</option>
+          </select>
+
+          {/* Specific Account Dropdown (only if bank or online selected) */}
+          {(filters.paymentMethodType === "bank" || filters.paymentMethodType === "online") && (
+            <select
+              className="input-field !py-2 !px-3 text-xs font-bold bg-white shadow-sm border-slate-200 w-[180px] flex-shrink-0"
+              value={filters.accountId}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, accountId: e.target.value }))
+              }
+            >
+              <option value="">All Accounts</option>
+              {accountsList
+                .filter((a: any) => a.paymentMethod?.type === filters.paymentMethodType)
+                .map((acc: any) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.label}{acc.accountNumber ? ` - ${acc.accountNumber}` : ''}
+                  </option>
+                ))}
+            </select>
+          )}
+
           {/* Category Filter Chips */}
-          <div className="flex flex-wrap gap-1 flex-1">
+          <div className="flex gap-1 flex-shrink-0">
             <button
               onClick={() => setFilters((f) => ({ ...f, categories: [] }))}
               className={clsx(
-                "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
                 filters.categories.length === 0
                   ? tab === "expense"
                     ? "bg-red-600 text-white"
@@ -363,7 +417,7 @@ export default function FinancePage() {
                   }))
                 }
                 className={clsx(
-                  "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                  "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
                   filters.categories.includes(cat)
                     ? tab === "expense"
                       ? "bg-red-600 text-white"
@@ -378,9 +432,9 @@ export default function FinancePage() {
 
           <button
             onClick={() =>
-              setFilters({ dateFrom: "", dateTo: "", categories: [] })
+              setFilters({ dateFrom: "", dateTo: "", categories: [], paymentMethodType: "", accountId: "" })
             }
-            className="text-[10px] font-black uppercase text-slate-400 hover:text-brand-blue tracking-widest px-3 py-1.5 border border-slate-200 rounded-lg hover:border-brand-blue transition-all"
+            className="text-[10px] font-black uppercase text-slate-400 hover:text-brand-blue tracking-widest px-3 py-1.5 border border-slate-200 rounded-lg hover:border-brand-blue transition-all whitespace-nowrap flex-shrink-0"
           >
             Clear
           </button>

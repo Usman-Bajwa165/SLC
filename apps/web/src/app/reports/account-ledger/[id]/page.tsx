@@ -110,9 +110,10 @@ export default function AccountLedgerPage() {
               onChange={(e) => setType(e.target.value)}
               className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm text-[10px] font-black uppercase outline-none text-slate-600 focus:text-brand-blue transition-colors appearance-none cursor-pointer min-w-[120px]"
             >
-              <option value="all">Any Type</option>
-              <option value="incoming">Incoming Only</option>
-              <option value="outgoing">Outgoing Only</option>
+              <option value="all">All</option>
+              <option value="incoming">Income</option>
+              <option value="outgoing">Outgoing</option>
+              <option value="adjustments">Adjustments</option>
             </select>
 
             {(from || to || type !== "all") && (

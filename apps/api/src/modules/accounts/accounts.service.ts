@@ -135,7 +135,8 @@ export class AccountsService implements OnModuleInit {
         const typeStr = newBalance.greaterThan(existingBalance) ? 'INCREASED' : 'DECREASED';
         const diffAbs = newBalance.minus(existingBalance).abs().toNumber().toLocaleString();
         
-        const msg = `🏦 *ACCOUNT BALANCE ${typeStr}*\n\nAccount: ${existing.label}\nAdjusted By: Rs. ${diffAbs}\nNew Balance: Rs. ${newBalance.toNumber().toLocaleString()}\nDate: ${dateStr}`;
+        const accountInfo = existing.accountNumber ? `${existing.label} - ${existing.accountNumber}` : existing.label;
+        const msg = `🏦 *ACCOUNT BALANCE ${typeStr}*\n\nAccount: ${accountInfo}\nPrevious Balance: Rs. ${existingBalance.toNumber().toLocaleString()}\nAdjusted By: Rs. ${diffAbs}\nNew Balance: Rs. ${newBalance.toNumber().toLocaleString()}\nDate: ${dateStr}`;
         await this.whatsapp.sendSystemNotification('account', msg);
       }
     }
@@ -206,5 +207,66 @@ export class AccountsService implements OnModuleInit {
     });
     await this.audit.log("account", id, "delete", account, null);
     return updated;
+  }
+
+  async adjustCashBalance(newBalance: number) {
+    // Calculate current cash balance
+    const [studentPayments, staffPayments, otherIncome, otherExpense] = await Promise.all([
+      this.prisma.payment.aggregate({
+        where: { accountId: null },
+        _sum: { amount: true },
+      }),
+      this.prisma.staffPayment.aggregate({
+        where: { accountId: null },
+        _sum: { amount: true },
+      }),
+      (this.prisma as any).otherTransaction.aggregate({
+        where: { accountId: null, type: 'income' },
+        _sum: { amount: true },
+      }),
+      (this.prisma as any).otherTransaction.aggregate({
+        where: { accountId: null, type: 'expense' },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const currentCash = new Decimal(studentPayments._sum.amount || 0)
+      .plus(otherIncome._sum.amount || 0)
+      .minus(staffPayments._sum.amount || 0)
+      .minus(otherExpense._sum.amount || 0);
+
+    const newBalanceDecimal = new Decimal(newBalance);
+    const diff = newBalanceDecimal.minus(currentCash);
+
+    if (!diff.isZero()) {
+      // Create adjustment transaction
+      // If diff is positive, we need to ADD income to increase balance
+      // If diff is negative, we need to ADD expense to decrease balance
+      await (this.prisma as any).otherTransaction.create({
+        data: {
+          type: diff.greaterThan(0) ? 'income' : 'expense',
+          category: 'Balance Adjustment',
+          amount: diff.abs(),
+          notes: `Cash balance manually adjusted from PKR ${currentCash.toFixed(2)} to PKR ${newBalanceDecimal.toFixed(2)}`,
+          date: new Date(),
+          accountId: null,
+        },
+      });
+
+      // Send notification
+      const dateStr = new Date().toLocaleDateString('en-PK', { 
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+      });
+      const typeStr = diff.greaterThan(0) ? 'INCREASED' : 'DECREASED';
+      const msg = `💰 *CASH BALANCE ${typeStr}*\n\nPrevious Balance: Rs. ${currentCash.toNumber().toLocaleString()}\nAdjusted By: Rs. ${diff.abs().toNumber().toLocaleString()}\nNew Balance: Rs. ${newBalanceDecimal.toNumber().toLocaleString()}\nDate: ${dateStr}`;
+      await this.whatsapp.sendSystemNotification('account', msg);
+    }
+
+    return { 
+      success: true, 
+      adjustment: diff.toNumber(),
+      oldBalance: currentCash.toNumber(),
+      newBalance: newBalanceDecimal.toNumber()
+    };
   }
 }

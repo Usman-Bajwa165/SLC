@@ -272,11 +272,6 @@ export class ReportsService {
         where: {
           accountId,
           ...(hasDate ? { date: dateQuery } : {}),
-          ...(type === "incoming"
-            ? { type: "income" }
-            : type === "outgoing"
-              ? { type: "expense" }
-              : {}),
         },
         orderBy: { date: "desc" },
       }),
@@ -293,20 +288,18 @@ export class ReportsService {
       }),
     ]);
 
-    const logs = [
-      ...(type === "outgoing"
-        ? []
-        : payments.map((p) => ({
-            id: `p-${p.id}`,
-            date: p.date,
-            type: "credit",
-            category: "Student Fee",
-            description: `Payment from ${p.student?.name || "Unknown Student"} - ${(p.student as any)?.registrationNo || "N/A"}`,
-            amount: p.amount,
-            reference: p.receiptNo,
-            senderName: p.senderName || p.receiverName,
-          }))),
-      ...otherItems.map((t) => ({
+    let logs = [
+      ...payments.map((p) => ({
+        id: `p-${p.id}`,
+        date: p.date,
+        type: "credit",
+        category: "Student Fee",
+        description: `Payment from ${p.student?.name || "Unknown Student"} - ${(p.student as any)?.registrationNo || "N/A"}`,
+        amount: p.amount,
+        reference: p.receiptNo,
+        senderName: p.senderName || p.receiverName,
+      })),
+      ...otherItems.map((t: any) => ({
         id: `t-${t.id}`,
         date: t.date,
         type: t.type === "income" ? "credit" : "debit",
@@ -316,19 +309,28 @@ export class ReportsService {
         reference: null,
         senderName: t.type === "income" ? t.senderName : t.receiverName,
       })),
-      ...(type === "incoming"
-        ? []
-        : staffPayments.map((sp) => ({
-            id: `sp-${sp.id}`,
-            date: sp.date,
-            type: "debit",
-            category: "Staff Salary",
-            description: `Staff payment to ${sp.staff?.name || "Unknown Staff"} (${sp.type})`,
-            amount: sp.amount,
-            reference: sp.month,
-            senderName: sp.receiverName,
-          }))),
+      ...staffPayments.map((sp) => ({
+        id: `sp-${sp.id}`,
+        date: sp.date,
+        type: "debit",
+        category: "Staff Salary",
+        description: `Staff payment to ${sp.staff?.name || "Unknown Staff"} (${sp.type})`,
+        amount: sp.amount,
+        reference: sp.month,
+        senderName: sp.receiverName,
+      })),
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Apply type filter
+    if (type === 'incoming') {
+      logs = logs.filter((l) => l.type === 'credit');
+    } else if (type === 'outgoing') {
+      logs = logs.filter((l) => l.type === 'debit');
+    } else if (type === 'in-out') {
+      logs = logs.filter((l) => l.category !== 'Balance Adjustment');
+    } else if (type === 'adjustments') {
+      logs = logs.filter((l) => l.category === 'Balance Adjustment');
+    }
 
     return {
       accountId,
@@ -393,6 +395,105 @@ export class ReportsService {
       totalAdvance: totalAdvance.toFixed(2),
       totalLoan: totalLoan.toFixed(2),
       totalRemaining: totalRemaining.toFixed(2),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async getCashLedger(from?: string, to?: string, type?: string) {
+    const dateQuery: any = {};
+    if (from) dateQuery.gte = new Date(from);
+    if (to) dateQuery.lte = new Date(to + 'T23:59:59Z');
+
+    const hasDate = Object.keys(dateQuery).length > 0;
+
+    const [payments, staffPayments, otherTxns] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: {
+          accountId: null,
+          ...(hasDate ? { date: dateQuery } : {}),
+        },
+        include: { 
+          student: { select: { name: true, registrationNo: true } }, 
+          method: { select: { name: true } } 
+        },
+        orderBy: { date: 'desc' },
+      }),
+      this.prisma.staffPayment.findMany({
+        where: {
+          accountId: null,
+          ...(hasDate ? { date: dateQuery } : {}),
+        },
+        include: { 
+          staff: { select: { name: true } }, 
+          method: { select: { name: true } } 
+        },
+        orderBy: { date: 'desc' },
+      }),
+      (this.prisma as any).otherTransaction.findMany({
+        where: {
+          accountId: null,
+          ...(hasDate ? { date: dateQuery } : {}),
+        },
+        orderBy: { date: 'desc' },
+      }),
+    ]);
+
+    let logs = [
+      ...payments.map((p: any) => ({
+        id: `p-${p.id}`,
+        date: p.date,
+        type: 'credit',
+        category: 'Student Fee',
+        description: `Payment from ${p.student.name} (${p.student.registrationNo})`,
+        amount: p.amount,
+        reference: p.receiptNo,
+        senderName: p.senderName,
+        receiverName: p.receiverName,
+      })),
+      ...staffPayments.map((p: any) => ({
+        id: `sp-${p.id}`,
+        date: p.date,
+        type: 'debit',
+        category: `Staff ${p.type.charAt(0).toUpperCase() + p.type.slice(1)}`,
+        description: `${p.type.toUpperCase()} to ${p.staff.name} - ${p.month}`,
+        amount: p.amount,
+        reference: p.month,
+        senderName: p.payerName,
+        receiverName: p.staff.name,
+      })),
+      ...otherTxns.map((t: any) => ({
+        id: `t-${t.id}`,
+        date: t.date,
+        type: t.type === 'income' ? 'credit' : 'debit',
+        category: t.category,
+        description: t.notes || 'No description',
+        amount: t.amount,
+        reference: null,
+        senderName: t.senderName,
+        receiverName: t.receiverName,
+      })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Apply type filter
+    if (type === 'incoming') {
+      logs = logs.filter((l) => l.type === 'credit');
+    } else if (type === 'outgoing') {
+      logs = logs.filter((l) => l.type === 'debit');
+    } else if (type === 'in-out') {
+      logs = logs.filter((l) => l.category !== 'Balance Adjustment');
+    } else if (type === 'adjustments') {
+      logs = logs.filter((l) => l.category === 'Balance Adjustment');
+    }
+
+    // Calculate total cash
+    const totalCash = logs.reduce((sum, log) => {
+      return sum + (log.type === 'credit' ? Number(log.amount) : -Number(log.amount));
+    }, 0);
+
+    return { 
+      logs, 
+      totalCash,
+      totalCount: logs.length,
       generatedAt: new Date().toISOString(),
     };
   }

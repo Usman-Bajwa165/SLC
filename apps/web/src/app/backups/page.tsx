@@ -112,7 +112,7 @@ export default function BackupsPage() {
                  </div>
                  <div className="flex justify-between text-sm">
                    <span className="font-bold text-slate-500">Last Synced:</span>
-                   <span className="font-bold text-slate-900">{new Date(dailyDb.modifiedAt).toLocaleString()}</span>
+                   <span className="font-bold text-slate-900">{new Date(dailyDb.modifiedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                  </div>
                </div>
              ) : (
@@ -140,7 +140,7 @@ export default function BackupsPage() {
                  </div>
                  <div className="flex justify-between text-sm">
                    <span className="font-bold text-slate-500">Last Synced:</span>
-                   <span className="font-bold text-slate-900">{new Date(dailyPdf.modifiedAt).toLocaleString()}</span>
+                   <span className="font-bold text-slate-900">{new Date(dailyPdf.modifiedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                  </div>
                </div>
              ) : (

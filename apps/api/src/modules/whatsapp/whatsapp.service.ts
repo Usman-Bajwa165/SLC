@@ -11,11 +11,18 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
   private isConnected = false;
   private isConnecting = false;
   private connectedNumber: string | null = null;
+  private pendingNotifications: Array<{ type: string; message: string }> = [];
+  private connectionCheckInterval: NodeJS.Timeout | null = null;
 
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
     await this.initClient();
+    
+    // Start checking for pending notifications every 5 seconds
+    this.connectionCheckInterval = setInterval(() => {
+      this.processPendingNotifications();
+    }, 5000);
   }
 
   private async initClient() {
@@ -114,6 +121,9 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+    }
     if (this.client) {
       this.logger.log('Destroying WhatsApp Client...');
       await this.client.destroy();
@@ -258,15 +268,49 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       this.logger.error('Failed to save notification to database:', e);
     }
 
+    // Queue WhatsApp message if should send
     if (shouldSend && settings.toNumber && settings.toNumber.length > 5) {
-      const sent = await this.sendMessage(settings.toNumber, message);
-      if (sent) {
-        this.logger.log(`✅ ${type} notification sent to WhatsApp successfully`);
+      if (this.isConnected) {
+        // Send immediately if connected
+        const sent = await this.sendMessage(settings.toNumber, message);
+        if (sent) {
+          this.logger.log(`✅ ${type} notification sent to WhatsApp successfully`);
+        } else {
+          this.logger.error(`❌ ${type} notification failed to send to WhatsApp`);
+        }
       } else {
-        this.logger.error(`❌ ${type} notification failed to send to WhatsApp`);
+        // Queue for later if not connected
+        this.pendingNotifications.push({ type, message });
+        this.logger.log(`📥 ${type} notification queued (WhatsApp not connected yet)`);
       }
     } else {
       this.logger.warn(`Notification not sent to WhatsApp - ShouldSend: ${shouldSend}, ToNumber valid: ${settings.toNumber && settings.toNumber.length > 5}`);
+    }
+  }
+
+  /**
+   * Process pending notifications when connection is established
+   */
+  private async processPendingNotifications() {
+    if (!this.isConnected || this.pendingNotifications.length === 0) {
+      return;
+    }
+
+    this.logger.log(`📤 Processing ${this.pendingNotifications.length} pending notifications...`);
+    const settings = await this.getSettings();
+    
+    while (this.pendingNotifications.length > 0) {
+      const notification = this.pendingNotifications.shift();
+      if (notification && settings.toNumber) {
+        const sent = await this.sendMessage(settings.toNumber, notification.message);
+        if (sent) {
+          this.logger.log(`✅ Queued ${notification.type} notification sent successfully`);
+        } else {
+          this.logger.error(`❌ Queued ${notification.type} notification failed`);
+        }
+        // Small delay between messages
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
   }
 }

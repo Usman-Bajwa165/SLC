@@ -391,7 +391,7 @@ function OutstandingReport() {
           color="blue"
         />
         <SummaryCard
-          label="Total Fee Receivable"
+          label="Total Fee"
           value={`PKR ${formatCurrency(data?.grandTotalPayable || 0)}`}
           icon={<BookOpen className="w-5 h-5" />}
           color="indigo"
@@ -403,7 +403,7 @@ function OutstandingReport() {
           color="green"
         />
         <SummaryCard
-          label="Receivable"
+          label="Total Receivable"
           value={`PKR ${formatCurrency(data?.grandTotalOutstanding || 0)}`}
           icon={<ReceiptText className="w-5 h-5" />}
           color="red"
@@ -853,6 +853,7 @@ function DailyReceiptsReport() {
 }
 
 function AccountsReport() {
+  const router = useRouter();
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
     null,
   );
@@ -998,15 +999,64 @@ function AccountsReport() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {isLoading
-              ? [...Array(3)].map((_, i) => (
-                  <tr key={i}>
-                    <td colSpan={7} className="px-6 py-5">
-                      <div className="h-10 bg-slate-50 rounded-2xl animate-pulse" />
-                    </td>
-                  </tr>
-                ))
-              : allAccounts.map((acc: any) => {
+            {isLoading ? (
+              [...Array(3)].map((_, i) => (
+                <tr key={i}>
+                  <td colSpan={7} className="px-6 py-5">
+                    <div className="h-10 bg-slate-50 rounded-2xl animate-pulse" />
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <>
+                <tr
+                  className="hover:bg-slate-50/50 transition-colors group bg-amber-50/30"
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+                        <Wallet className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-900 group-hover:text-brand-blue transition-colors">
+                          Cash in Hand
+                        </p>
+                        <p className="text-[10px] font-bold text-slate-400">
+                          Direct Cash Transactions
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-amber-100 text-amber-700">
+                      cash
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 font-mono text-xs text-slate-600">
+                    —
+                  </td>
+                  <td className="px-6 py-4 text-right font-bold text-slate-500 uppercase text-[10px]">
+                    —
+                  </td>
+                  <td className="px-6 py-4 text-right font-black text-slate-900 uppercase text-[10px]">
+                    PKR {formatCurrency(cashBalance)}
+                  </td>
+                  <td className="px-6 py-4 text-right font-black uppercase text-[10px] text-slate-400">
+                    —
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => {
+                        showBar();
+                        router.push("/reports/cash-ledger");
+                      }}
+                      className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors mx-auto"
+                    >
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    </button>
+                  </td>
+                </tr>
+                {allAccounts.map((acc: any) => {
                   const opening = Number(acc.openingBalance || 0);
                   const current = Number(acc.currentBalance || 0);
                   const diff = current - opening;
@@ -1068,6 +1118,8 @@ function AccountsReport() {
                     </tr>
                   );
                 })}
+              </>
+            )}
           </tbody>
         </table>
       </div>
@@ -1154,10 +1206,27 @@ function StaffReport() {
               exportToPDF({
                 title: "STAFF SALARY REPORT",
                 filename: "Staff_Report",
-                columns: ["Name", "CNIC", "Role", "Basic Salary", "Paid", "Remaining"],
+                columns: [
+                  "Name",
+                  "CNIC",
+                  "Role",
+                  "Basic Salary",
+                  "Paid",
+                  "Remaining",
+                ],
                 data: staff.map((s: any) => {
-                  const paid = s.financeRecords?.reduce((sum: number, f: any) => sum + parseFloat(f.salaryPaid || 0), 0) || 0;
-                  const remaining = s.financeRecords?.reduce((sum: number, f: any) => sum + parseFloat(f.remaining || 0), 0) || 0;
+                  const paid =
+                    s.financeRecords?.reduce(
+                      (sum: number, f: any) =>
+                        sum + parseFloat(f.salaryPaid || 0),
+                      0,
+                    ) || 0;
+                  const remaining =
+                    s.financeRecords?.reduce(
+                      (sum: number, f: any) =>
+                        sum + parseFloat(f.remaining || 0),
+                      0,
+                    ) || 0;
                   return [
                     s.name,
                     s.cnic,
@@ -1169,9 +1238,18 @@ function StaffReport() {
                 }),
                 summary: [
                   { label: "Total Staff", value: String(staff.length) },
-                  { label: "Monthly Salary Base", value: `PKR ${formatCurrency(totalSalary)}` },
-                  { label: "Total Paid", value: `PKR ${formatCurrency(totalPaid)}` },
-                  { label: "Total Remaining", value: `PKR ${formatCurrency(totalRemaining)}` },
+                  {
+                    label: "Monthly Salary Base",
+                    value: `PKR ${formatCurrency(totalSalary)}`,
+                  },
+                  {
+                    label: "Total Paid",
+                    value: `PKR ${formatCurrency(totalPaid)}`,
+                  },
+                  {
+                    label: "Total Remaining",
+                    value: `PKR ${formatCurrency(totalRemaining)}`,
+                  },
                 ],
               });
               setTimeout(hideBar, 500);

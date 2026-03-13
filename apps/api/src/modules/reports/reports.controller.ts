@@ -81,6 +81,15 @@ export class ReportsController {
     return this.service.staffLedger(id, from, to);
   }
 
+  @Get("cash-ledger")
+  cashLedger(
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("type") type?: string,
+  ) {
+    return this.service.getCashLedger(from, to, type);
+  }
+
   // ── CSV Exports ─────────────────────────────────────────────────────────────
 
   @Get("outstanding/export")
